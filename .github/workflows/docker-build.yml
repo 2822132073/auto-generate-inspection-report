@@ -43,29 +43,30 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      # 4. 提取镜像元数据和标签
+      # 4. 获取短 SHA
+      - name: 获取 Git 短 SHA
+        id: short-sha
+        run: echo "sha=$(echo ${{ github.sha }} | cut -c1-10)" >> $GITHUB_OUTPUT
+      
+      # 5. 提取镜像元数据和标签
       - name: 提取 Docker 元数据
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}
           tags: |
+            # commit前7位 + 日期（如：abc1234-20260103）
+            type=raw,value=${{ steps.short-sha.outputs.sha }}-{{date 'YYYYMMDD'}},enable=true
             # 对于 main/master 分支，标记为 latest
             type=raw,value=latest,enable={{is_default_branch}}
             # 对于标签，提取版本号
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            # 使用分支名作为标签
-            type=ref,event=branch
-            # 使用 git short SHA
-            type=sha,prefix={{branch}}-
           labels: |
             org.opencontainers.image.title=Inspection Report System
             org.opencontainers.image.description=服务器巡检报告系统 - 一体化容器
             org.opencontainers.image.vendor=${{ github.repository_owner }}
       
-      # 5. 构建并推送 Docker 镜像
+      # 6. 构建并推送 Docker 镜像
       - name: 构建并推送镜像
         uses: docker/build-push-action@v5
         with:
@@ -84,7 +85,7 @@ jobs:
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
       
-      # 6. 输出镜像信息
+      # 7. 输出镜像信息
       - name: 输出镜像信息
         run: |
           echo "## 🎉 镜像构建成功！" >> $GITHUB_STEP_SUMMARY
