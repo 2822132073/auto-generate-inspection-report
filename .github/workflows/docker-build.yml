@@ -43,15 +43,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      # # 4. 登录 Docker Hub（可选）
-      # - name: 登录 Docker Hub
-      #   if: github.event_name != 'pull_request'
-      #   with:
-      #     username: ${{ secrets.DOCKER_USERNAME }}
-      #     password: ${{ secrets.DOCKER_PASSWORD }}
-      #   continue-on-error: true
-      
-      # 5. 提取镜像元数据和标签
+      # 4. 提取镜像元数据和标签
       - name: 提取 Docker 元数据
         id: meta
         uses: docker/metadata-action@v5
@@ -73,23 +65,8 @@ jobs:
             org.opencontainers.image.description=服务器巡检报告系统 - 一体化容器
             org.opencontainers.image.vendor=${{ github.repository_owner }}
       
-      # 5.1 提取 Docker Hub 元数据（仅当配置了凭据时）
-      - name: 提取 Docker Hub 元数据
-        id: meta-dockerhub
-        if: ${{ secrets.DOCKER_USERNAME != '' }}
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-      
-      # 6. 构建并推送 Docker 镜像到 GHCR
-      - name: 构建并推送镜像到 GHCR
+      # 5. 构建并推送 Docker 镜像
+      - name: 构建并推送镜像
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -107,24 +84,7 @@ jobs:
             VCS_REF=${{ github.sha }}
             VERSION=${{ steps.meta.outputs.version }}
       
-      # 6.1 推送到 Docker Hub（仅当配置了凭据时）
-      - name: 构建并推送镜像到 Docker Hub
-        if: ${{ secrets.DOCKER_USERNAME != '' }}
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.all-in-one
-          platforms: linux/amd64
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-dockerhub.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          build-args: |
-            BUILD_DATE=${{ github.event.head_commit.timestamp }}
-            VCS_REF=${{ github.sha }}
-            VERSION=${{ steps.meta.outputs.version }}
-      
-      # 7. 输出镜像信息
+      # 6. 输出镜像信息
       - name: 输出镜像信息
         run: |
           echo "## 🎉 镜像构建成功！" >> $GITHUB_STEP_SUMMARY
