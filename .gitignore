@@ -1,0 +1,26 @@
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.egg-info/
+
+# 日志文件
+*.log
+backend.log
+frontend.log
+
+# PID 文件
+.backend.pid
+.frontend.pid
+
+# 数据库
+data/*.db
+data/*.db-journal
+
+# IDE
+.vscode/
+.idea/
+.DS_Store

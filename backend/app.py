@@ -9,6 +9,8 @@ from flask_cors import CORS
 from io import BytesIO
 import sys
 import os
+import signal
+import atexit
 from pathlib import Path
 
 # 添加当前目录到 Python 路径
@@ -215,7 +217,42 @@ def generate():
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    host = os.environ.get('HOST', '0.0.0.0')
-    print(f"正在启动服务器，监听 {host}:{port}...")
-    app.run(host=host, port=port, debug=False)
+    # 写入 PID 文件
+    pid_file = Path(__file__).parent.parent / '.backend.pid'
+    pid_file.write_text(str(os.getpid()))
+    print(f"后端进程 PID: {os.getpid()}")
+    
+    # 定义清理函数
+    def cleanup():
+        """清理 PID 文件"""
+        if pid_file.exists():
+            pid_file.unlink()
+            print("\n后端服务已停止，PID 文件已清理")
+    
+    # 注册退出时的清理函数
+    atexit.register(cleanup)
+    
+    # 信号处理器
+    def signal_handler(signum, frame):
+        """处理终止信号"""
+        print(f"\n收到信号 {signum}，正在关闭服务器...")
+        cleanup()
+        sys.exit(0)
+    
+    # 注册信号处理器
+    signal.signal(signal.SIGTERM, signal_handler)  # kill 命令
+    signal.signal(signal.SIGINT, signal_handler)   # Ctrl+C
+    
+    try:
+        port = int(os.environ.get('PORT', 5000))
+        host = os.environ.get('HOST', '0.0.0.0')
+        print(f"正在启动服务器，监听 {host}:{port}...")
+        print("按 Ctrl+C 停止服务")
+        app.run(host=host, port=port, debug=False, use_reloader=False)
+    except KeyboardInterrupt:
+        print("\n接收到键盘中断")
+        cleanup()
+    except Exception as e:
+        print(f"\n服务器异常: {e}")
+        cleanup()
+        raise

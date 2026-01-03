@@ -1,5 +1,5 @@
 #!/bin/bash
-# Backend 启动脚本
+# Frontend 启动脚本
 
 # 颜色定义
 GREEN='\033[0;32m'
@@ -9,35 +9,27 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}  服务器巡检报告系统 - 后端服务${NC}"
+echo -e "${BLUE}  服务器巡检报告系统 - 前端服务${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
-# 切换到 backend 目录
+# 切换到 web-frontend 目录
 cd "$(dirname "$0")"
 
-# 检查 Python
-if ! command -v python3 &> /dev/null; then
-    echo "错误: 未找到 python3，请先安装 Python 3.7+"
+# 检查 Node.js
+if ! command -v node &> /dev/null; then
+    echo -e "${RED}错误: 未找到 node，请先安装 Node.js${NC}"
     exit 1
 fi
 
-# 检查虚拟环境
-if [ ! -d "../venv" ]; then
-    echo -e "${GREEN}创建虚拟环境...${NC}"
-    python3 -m venv ../venv
+# 检查 npm
+if ! command -v npm &> /dev/null; then
+    echo -e "${RED}错误: 未找到 npm，请先安装 npm${NC}"
+    exit 1
 fi
 
-# 激活虚拟环境
-echo -e "${GREEN}激活虚拟环境...${NC}"
-source ../venv/bin/activate
-
-# 安装依赖
-echo -e "${GREEN}检查依赖...${NC}"
-pip install -q -r requirements.txt
-
 # 设置默认端口
-PORT=${PORT:-8000}
+PORT=${PORT:-5173}
 
 # 检查端口是否被占用
 check_and_kill_port() {
@@ -45,7 +37,7 @@ check_and_kill_port() {
     echo -e "${GREEN}检查端口 ${port} 是否被占用...${NC}"
     
     # 查找占用端口的进程
-    local pid=$(lsof -ti:${port} 2>/dev/null)
+    local pid=$(lsof -ti:${port})
     
     if [ -n "$pid" ]; then
         echo -e "${YELLOW}端口 ${port} 被进程 ${pid} 占用${NC}"
@@ -61,13 +53,21 @@ check_and_kill_port() {
 # 检查并杀死占用的端口
 check_and_kill_port $PORT
 
+# 检查 node_modules
+if [ ! -d "node_modules" ]; then
+    echo -e "${GREEN}安装依赖...${NC}"
+    npm install
+else
+    echo -e "${GREEN}依赖已安装${NC}"
+fi
+
 echo ""
-echo -e "${GREEN}启动后端服务...${NC}"
-echo -e "${BLUE}监听地址: http://0.0.0.0:${PORT}${NC}"
-echo -e "${BLUE}API 文档: http://localhost:${PORT}/api/v1${NC}"
+echo -e "${GREEN}启动前端开发服务器...${NC}"
+echo -e "${BLUE}访问地址: http://localhost:${PORT}${NC}"
+echo -e "${BLUE}API 地址: http://localhost:5000/api/v1${NC}"
 echo ""
 echo "按 Ctrl+C 停止服务"
 echo ""
 
 # 启动服务
-python app.py
+npm run dev

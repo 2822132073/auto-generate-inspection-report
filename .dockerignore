@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# 文档
+*.md
+LICENSE
+CLAUDE.md
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# 数据和日志
+data/
+*.log
+*.db
+*.db-journal
+
+# 构建产物
+dist/
+build/
+*.pyc
+
+# 测试
+test*.json
+test*.sh
+output/
+
+# 其他
+.qoder/
+api/
+generate_test_data.*
+post.py

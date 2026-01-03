@@ -101,43 +101,15 @@
         <el-form-item label="报告标题">
           <el-input v-model="reportForm.title" placeholder="请输入报告标题" />
         </el-form-item>
-
-        <el-form-item label="选择模板">
-          <el-radio-group v-model="reportForm.templateId" class="template-group">
-            <el-card
-              v-for="template in templates"
-              :key="template.id"
-              :class="['template-card', { selected: reportForm.templateId === template.id }]"
-              @click="reportForm.templateId = template.id"
-            >
-              <el-radio :label="template.id" class="template-radio">
-                <div class="template-info">
-                  <div class="template-name">
-                    {{ template.name }}
-                    <el-tag v-if="template.is_default" type="success" size="small">推荐</el-tag>
-                  </div>
-                  <div class="template-desc">{{ template.description }}</div>
-                  <div class="template-config">
-                    <el-icon v-if="template.config.include_return_code" color="#67c23a"><CircleCheck /></el-icon>
-                    <el-icon v-else color="#909399"><CircleClose /></el-icon>
-                    <span>返回码</span>
-                    
-                    <el-icon v-if="template.config.include_output" color="#67c23a"><CircleCheck /></el-icon>
-                    <el-icon v-else color="#909399"><CircleClose /></el-icon>
-                    <span>输出</span>
-                    
-                    <el-icon v-if="template.config.include_screenshots" color="#67c23a"><CircleCheck /></el-icon>
-                    <el-icon v-else color="#909399"><CircleClose /></el-icon>
-                    <span>截图</span>
-                  </div>
-                </div>
-              </el-radio>
-            </el-card>
-          </el-radio-group>
-        </el-form-item>
       </el-form>
 
-      <template #footer>
+      <!-- 移除了模板选择 UI，默认使用简化模板 -->
+      <div v-if="selectedTemplate" class="template-info-display">
+        <p><strong>使用模板:</strong> {{ selectedTemplate.name }}</p>
+        <p class="template-desc-text">{{ selectedTemplate.description }}</p>
+      </div>
+
+    <template #footer>
         <el-button @click="showReportDialog = false">取消</el-button>
         <el-button type="primary" @click="handleGenerateReport" :loading="generating">
           生成报告
@@ -269,7 +241,7 @@ const fetchTemplates = async () => {
     const res = await getTemplates()
     templates.value = res.data.templates || []
     
-    // 默认选中推荐模板
+    // 自动选中推荐模板（默认为简化模板）
     const defaultTemplate = templates.value.find(t => t.is_default)
     if (defaultTemplate) {
       reportForm.value.templateId = defaultTemplate.id
@@ -280,6 +252,11 @@ const fetchTemplates = async () => {
     console.error('获取模板列表失败:', error)
   }
 }
+
+// 计算当前选中的模板
+const selectedTemplate = computed(() => {
+  return templates.value.find(t => t.id === reportForm.value.templateId)
+})
 
 // 生成报告
 const handleGenerateReport = async () => {
@@ -442,54 +419,25 @@ onMounted(async () => {
   color: #909399;
 }
 
-.template-group {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* 已移除模板选择相关样式 */
+
+.template-info-display {
+  padding: 12px;
+  background-color: #f0f9ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  margin-top: 12px;
 }
 
-.template-card {
-  cursor: pointer;
-  transition: all 0.3s;
-  border: 2px solid #ebeef5;
-}
-
-.template-card.selected {
-  border-color: #409eff;
-  background-color: #ecf5ff;
-}
-
-.template-radio {
-  width: 100%;
-}
-
-.template-info {
-  margin-left: 8px;
-}
-
-.template-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 6px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.template-desc {
+.template-info-display p {
+  margin: 6px 0;
   font-size: 14px;
-  color: #606266;
-  margin-bottom: 10px;
+  color: #303133;
 }
 
-.template-config {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #909399;
+.template-desc-text {
+  color: #606266 !important;
+  font-size: 13px !important;
 }
 
 .loading-container {
