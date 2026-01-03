@@ -76,7 +76,7 @@ jobs:
       # 5.1 提取 Docker Hub 元数据（仅当配置了凭据时）
       - name: 提取 Docker Hub 元数据
         id: meta-dockerhub
-        if: secrets.DOCKER_USERNAME != ''
+        if: ${{ secrets.DOCKER_USERNAME != '' }}
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
@@ -109,7 +109,7 @@ jobs:
       
       # 6.1 推送到 Docker Hub（仅当配置了凭据时）
       - name: 构建并推送镜像到 Docker Hub
-        if: secrets.DOCKER_USERNAME != ''
+        if: ${{ secrets.DOCKER_USERNAME != '' }}
         uses: docker/build-push-action@v5
         with:
           context: .
