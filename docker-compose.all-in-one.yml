@@ -3,9 +3,6 @@ version: '3.8'
 services:
   # 一体化服务（前端 + 后端在同一容器）
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile.all-in-one
     container_name: inspection-all-in-one
     restart: unless-stopped
     
@@ -24,14 +21,9 @@ services:
     volumes:
       # 数据持久化（截图和报告存储）
       - ./data:/app/data
-      # 字体文件（可选，如果需要自定义字体）
-      - ./OperatorMono-Medium.otf:/app/OperatorMono-Medium.otf:ro
-      # 开发环境下可以挂载代码实时调试（生产环境删除以下行）
-      # - ./backend:/app/backend:ro
-      # - ./web-frontend/dist:/usr/share/nginx/html:ro
     
     healthcheck:
-      test: ["/app/healthcheck.sh"]
+      test: ["CMD","/app/healthcheck.sh"]
       interval: 30s
       timeout: 10s
       retries: 3
