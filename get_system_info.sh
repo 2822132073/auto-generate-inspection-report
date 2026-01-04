@@ -167,12 +167,8 @@ collect_commands_data() {
         [[ "$first" == "false" ]] && commands_json="$commands_json,"
         first=false
         
-        # Execute command and parse result
-        if [[ "$cmd_name" == *"mysql"* ]]; then
-            cmd_result=$(execute_command "$cmd_exec" "No MySQL process found")
-        else
-            cmd_result=$(execute_command "$cmd_exec" "Command failed: $cmd_name")
-        fi
+
+        cmd_result=$(execute_command "$cmd_exec" "Command failed: $cmd_name")
         
         # Parse return code and output
         return_code="${cmd_result%%|*}"
