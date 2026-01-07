@@ -3,12 +3,13 @@
 # =============================================================================
 # System Information Collection Script
 # =============================================================================
-# Description: Collects system information and outputs in JSON format
-# Usage: ./get_system_info.sh [project_id]
+# Description: Collects system information and uploads to server
+# Usage: ./get_system_info.sh <server_url> <project_id>
 # Parameters:
-#   project_id: Optional project identifier (defaults to 'unknown')
+#   server_url: Server address (e.g., http://localhost:5000)
+#   project_id: Project identifier
 # Author: Generated Script
-# Version: 2.1
+# Version: 3.0
 # =============================================================================
 
 # Script configuration
@@ -17,10 +18,11 @@ set -euo pipefail  # Exit on error, undefined variables, and pipe failures
 export LANG=C
 
 # Global variables
-declare -g TMP_FILE
-declare -g IP_ADDRESS
-declare -g PS1_VALUE
-declare -g PROJECT_ID
+TMP_FILE=""
+IP_ADDRESS=""
+PS1_VALUE=""
+PROJECT_ID=""
+SERVER_URL=""
 
 # =============================================================================
 # Utility Functions
@@ -78,25 +80,31 @@ execute_command() {
 # Get network IP address with fallback methods
 get_ip_address() {
     local ip
-    
-    # Method 1: Use route and ifconfig (most compatible)
-    local default_interface
-    default_interface=$(route -n 2>/dev/null | grep '^0.0.0.0' | awk '{print $8}' | head -1)
-    
-    if [[ -n "$default_interface" ]]; then
-        ip=$(ifconfig "$default_interface" 2>/dev/null | awk '/inet / && !/127.0.0.1/ {gsub(/addr:/,"",$2); print $2; exit}')
+
+    # Method 1: macOS - use route and ifconfig
+    if [[ "$(uname)" == "Darwin" ]]; then
+        ip=$(ifconfig | awk '/inet / && !/127.0.0.1/ {print $2; exit}')
     fi
-    
-    # Method 2: Fallback to hostname -I
+
+    # Method 2: Linux - use hostname -I
     if [[ -z "$ip" ]]; then
         ip=$(hostname -I 2>/dev/null | awk '{print $1}')
     fi
-    
-    # Method 3: Fallback to ip route
+
+    # Method 3: Linux - use ip route with awk (compatible)
     if [[ -z "$ip" ]]; then
-        ip=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+        ip=$(ip route get 8.8.8.8 2>/dev/null | awk '/src/ {for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)
     fi
-    
+
+    # Method 4: Use route and ifconfig
+    if [[ -z "$ip" ]]; then
+        local default_interface
+        default_interface=$(route -n 2>/dev/null | grep '^0.0.0.0' | awk '{print $8}' | head -1)
+        if [[ -n "$default_interface" ]]; then
+            ip=$(ifconfig "$default_interface" 2>/dev/null | awk '/inet / && !/127.0.0.1/ {gsub(/addr:/,"",$2); print $2; exit}')
+        fi
+    fi
+
     echo "${ip:-unknown}"
 }
 
@@ -146,37 +154,44 @@ collect_env_data() {
     echo "$env_json"
 }
 
-# Define system commands to execute
-declare -A SYSTEM_COMMANDS=(
-    ["df -Th |egrep -v 'overlay|tmpfs|nfs'"]="df -Th |egrep -v 'overlay|tmpfs|nfs'"
-    ["top -b -n 1|head -6"]="top -b -n 1 | head -6"
-    ["free -h"]="free -h"
-    ["ps -ef|grep mysql"]="ps -ef | grep mysql | grep -v grep"
+# Define system commands to execute (using simple arrays for compatibility)
+COMMAND_NAMES=(
+    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
+    "top -b -n 1|head -6"
+    "free -h"
+    "ps -ef|grep mysql"
+)
+
+COMMAND_EXECS=(
+    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
+    "top -b -n 1 | head -6"
+    "free -h"
+    "ps -ef | grep mysql | grep -v grep"
 )
 
 # Collect command execution results
 collect_commands_data() {
     local commands_json="{"
     local first=true
-    local cmd_name cmd_exec cmd_result return_code output escaped_output
-    
-    for cmd_name in "${!SYSTEM_COMMANDS[@]}"; do
-        cmd_exec="${SYSTEM_COMMANDS[$cmd_name]}"
-        
+    local i cmd_name cmd_exec cmd_result return_code output escaped_output
+
+    for i in "${!COMMAND_NAMES[@]}"; do
+        cmd_name="${COMMAND_NAMES[$i]}"
+        cmd_exec="${COMMAND_EXECS[$i]}"
+
         # Add comma separator except for first item
         [[ "$first" == "false" ]] && commands_json="$commands_json,"
         first=false
-        
 
         cmd_result=$(execute_command "$cmd_exec" "Command failed: $cmd_name")
-        
+
         # Parse return code and output
         return_code="${cmd_result%%|*}"
         output="${cmd_result#*|}"
-        
+
         # Escape output for JSON
         escaped_output=$(escape_json "$output")
-        
+
         # Build JSON structure for this command
         commands_json="$commands_json\"$cmd_name\": {"
         commands_json="$commands_json\"command\": \"$(escape_json "$cmd_exec")\","
@@ -184,7 +199,7 @@ collect_commands_data() {
         commands_json="$commands_json\"output\": \"$escaped_output\""
         commands_json="$commands_json}"
     done
-    
+
     commands_json="$commands_json}"
     echo "$commands_json"
 }
@@ -210,9 +225,23 @@ collect_metadata() {
 
 # Initialize all required data
 init_data() {
-    # Get project_id from first command line argument
-    PROJECT_ID="${1:-unknown}"
-    
+    # Get server_url from first argument, project_id from second
+    SERVER_URL="${1:-}"
+    PROJECT_ID="${2:-}"
+
+    # Validate required parameters
+    if [[ -z "$SERVER_URL" ]]; then
+        echo "Error: Server URL is required" >&2
+        echo "Usage: $0 <server_url> <project_id>" >&2
+        exit 1
+    fi
+
+    if [[ -z "$PROJECT_ID" ]]; then
+        echo "Error: Project ID is required" >&2
+        echo "Usage: $0 <server_url> <project_id>" >&2
+        exit 1
+    fi
+
     IP_ADDRESS=$(get_ip_address)
     PS1_VALUE=$(get_ps1_value)
 }
@@ -220,16 +249,16 @@ init_data() {
 # Generate final JSON output
 generate_output() {
     local env_data commands_data metadata_data final_output
-    
+
     echo "# Collecting environment data..." >&2
     env_data=$(collect_env_data)
-    
+
     echo "# Collecting command execution results..." >&2
     commands_data=$(collect_commands_data)
-    
+
     echo "# Collecting system metadata..." >&2
     metadata_data=$(collect_metadata)
-    
+
     # Combine all data into final JSON structure
     final_output="{"
     final_output="$final_output\"data\": {"
@@ -238,8 +267,37 @@ generate_output() {
     final_output="$final_output},"
     final_output="$final_output\"metadata\": $metadata_data"
     final_output="$final_output}"
-    
+
     echo "$final_output"
+}
+
+# Upload data to server
+upload_to_server() {
+    local json_data="$1"
+    local api_url="${SERVER_URL}/api/v1/inspections"
+
+    echo "# Uploading to server: $api_url" >&2
+
+    local response
+    local http_code
+
+    # Use curl to upload, capture response and http code
+    response=$(curl -s -w "\n%{http_code}" -X POST "$api_url" \
+        -H "Content-Type: application/json" \
+        -d "$json_data" 2>&1)
+
+    http_code=$(echo "$response" | tail -n1)
+    response=$(echo "$response" | sed '$d')
+
+    if [[ "$http_code" -ge 200 && "$http_code" -lt 300 ]]; then
+        echo "# Upload successful (HTTP $http_code)" >&2
+        echo "$response"
+        return 0
+    else
+        echo "# Upload failed (HTTP $http_code)" >&2
+        echo "# Response: $response" >&2
+        return 1
+    fi
 }
 
 # =============================================================================
@@ -248,16 +306,20 @@ generate_output() {
 
 main() {
     echo "# Starting system information collection..." >&2
-    
+
     # Initialize script environment
     init_script
-    
+
     # Initialize required data with command line arguments
     init_data "$@"
-    
-    # Generate and output JSON
-    generate_output
-    
+
+    # Generate JSON data
+    local json_data
+    json_data=$(generate_output)
+
+    # Upload to server
+    upload_to_server "$json_data"
+
     echo "# System information collection completed." >&2
 }
 
