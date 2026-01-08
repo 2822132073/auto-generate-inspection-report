@@ -79,7 +79,7 @@ execute_command() {
 
 # Get network IP address with fallback methods
 get_ip_address() {
-    local ip
+    local ip=""
 
     # Method 1: macOS - use route and ifconfig
     if [[ "$(uname)" == "Darwin" ]]; then
