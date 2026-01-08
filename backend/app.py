@@ -23,7 +23,7 @@ from api.report_routes import report_bp
 from api.template_routes import template_bp
 from api.project_routes import project_bp
 from services.template_service import TemplateService
-from config import SCREENSHOTS_DIR
+from config import SCREENSHOTS_DIR, DATA_DIR, REPORTS_DIR, DATABASE_PATH
 
 app = Flask(__name__)
 CORS(app)  # 启用跨域支持
@@ -257,6 +257,10 @@ if __name__ == '__main__':
         port = int(os.environ.get('PORT', 5000))
         host = os.environ.get('HOST', '0.0.0.0')
         print(f"正在启动服务器，监听 {host}:{port}...")
+        print(f"数据目录: {DATA_DIR.resolve()}")
+        print(f"截图目录: {SCREENSHOTS_DIR.resolve()}")
+        print(f"报告目录: {REPORTS_DIR.resolve()}")
+        print(f"数据库: {DATABASE_PATH.resolve()}")
         print("按 Ctrl+C 停止服务")
         app.run(host=host, port=port, debug=False, use_reloader=False)
     except KeyboardInterrupt:
