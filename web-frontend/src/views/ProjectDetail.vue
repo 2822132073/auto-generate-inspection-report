@@ -14,10 +14,16 @@
             <h2>{{ projectInfo?.project_name || projectCode }}</h2>
             <p class="project-code">{{ projectCode }}</p>
           </div>
-          <el-button type="primary" @click="showReportDialog = true">
-            <el-icon><Document /></el-icon>
-            生成巡检报告
-          </el-button>
+          <div class="header-buttons">
+            <el-button type="success" plain @click="showDeployDialog = true">
+              <el-icon><DocumentCopy /></el-icon>
+              复制部署命令
+            </el-button>
+            <el-button type="primary" @click="showReportDialog = true">
+              <el-icon><Document /></el-icon>
+              生成巡检报告
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -132,6 +138,23 @@
         </template>
       </el-result>
     </el-dialog>
+
+    <!-- 部署命令对话框 -->
+    <el-dialog
+      v-model="showDeployDialog"
+      title="部署命令"
+      width="650px"
+    >
+      <p class="deploy-tip">在目标服务器上执行以下命令，即可自动部署巡检脚本并设置定时任务：</p>
+      <pre class="deploy-command">{{ deployCommand }}</pre>
+      <template #footer>
+        <el-button @click="showDeployDialog = false">取消</el-button>
+        <el-button type="primary" @click="copyDeployCommand">
+          <el-icon><DocumentCopy /></el-icon>
+          复制命令
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -159,6 +182,7 @@ const hostInspectionCounts = ref({})
 // 报告相关
 const showReportDialog = ref(false)
 const showSuccessDialog = ref(false)
+const showDeployDialog = ref(false)
 const templates = ref([])
 const generating = ref(false)
 const reportInfo = ref(null)
@@ -257,6 +281,29 @@ const fetchTemplates = async () => {
 const selectedTemplate = computed(() => {
   return templates.value.find(t => t.id === reportForm.value.templateId)
 })
+
+// 计算部署命令
+const deployCommand = computed(() => {
+  const serverUrl = window.location.origin
+  const code = projectInfo.value?.project_code || projectCode
+  return `# 下载巡检脚本
+curl -o /usr/local/bin/get_system_info.sh ${serverUrl}/static/get_system_info.sh
+chmod +x /usr/local/bin/get_system_info.sh
+
+# 添加 cron 任务（每天凌晨2点执行）
+(crontab -l 2>/dev/null; echo "0 2 * * * /usr/local/bin/get_system_info.sh ${serverUrl} ${code}") | crontab -`
+})
+
+// 复制部署命令
+const copyDeployCommand = async () => {
+  try {
+    await navigator.clipboard.writeText(deployCommand.value)
+    ElMessage.success('部署命令已复制到剪贴板')
+    showDeployDialog.value = false
+  } catch (err) {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
 
 // 生成报告
 const handleGenerateReport = async () => {
@@ -442,5 +489,21 @@ onMounted(async () => {
 
 .loading-container {
   padding: 20px;
+}
+
+.deploy-tip {
+  margin-bottom: 12px;
+  color: #606266;
+}
+
+.deploy-command {
+  background: #f5f7fa;
+  padding: 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>

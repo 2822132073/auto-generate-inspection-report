@@ -56,6 +56,16 @@ def health():
     return jsonify({"status": "ok"}), 200
 
 
+# ========== 静态脚本下载 ==========
+@app.route('/static/get_system_info.sh', methods=['GET'])
+def serve_script():
+    """提供巡检脚本下载"""
+    script_path = Path(__file__).parent.parent / 'get_system_info.sh'
+    if not script_path.exists():
+        return jsonify({'error': '脚本文件不存在'}), 404
+    return send_file(script_path, mimetype='text/plain', as_attachment=True)
+
+
 @app.route('/api/v1/stats', methods=['GET'])
 def stats():
     """系统统计信息"""
