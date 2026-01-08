@@ -54,6 +54,7 @@ class ScreenshotService:
         # 保存文件
         with open(file_path, 'wb') as f:
             f.write(screenshot_bytes)
+        print(f"截图已保存: {file_path}")
 
         # 返回相对路径
         return f"{month_dir}/{filename}"
