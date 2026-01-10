@@ -25,12 +25,13 @@ FRONTEND_PORT=${FRONTEND_PORT:-5173}
 check_and_kill_port() {
     local port=$1
     local service=$2
-    
+    local pid_file="${3}"
+
     echo -e "${GREEN}[${service}] 检查端口 ${port}...${NC}"
-    
+
     # 查找占用端口的进程
     local pid=$(lsof -ti:${port} 2>/dev/null)
-    
+
     if [ -n "$pid" ]; then
         echo -e "${YELLOW}[${service}] 端口 ${port} 被进程 ${pid} 占用，正在终止...${NC}"
         kill -9 $pid 2>/dev/null
@@ -39,14 +40,20 @@ check_and_kill_port() {
     else
         echo -e "${GREEN}[${service}] 端口 ${port} 可用${NC}"
     fi
+
+    # 删除可能存在的旧 pid 文件
+    if [ -n "$pid_file" ] && [ -f "$pid_file" ]; then
+        rm -f "$pid_file"
+        echo -e "${GREEN}[${service}] 已清理旧 PID 文件${NC}"
+    fi
 }
 
 # 检查端口占用
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  检查端口占用${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-check_and_kill_port $BACKEND_PORT "后端"
-check_and_kill_port $FRONTEND_PORT "前端"
+check_and_kill_port $BACKEND_PORT "后端" "${PROJECT_ROOT}/.backend.pid"
+check_and_kill_port $FRONTEND_PORT "前端" "${PROJECT_ROOT}/.frontend.pid"
 echo ""
 
 # 启动后端服务
