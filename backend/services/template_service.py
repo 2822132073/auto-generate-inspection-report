@@ -154,68 +154,47 @@ class TemplateService:
             return templates
 
     @staticmethod
-    def get_template(template_id):
-        """获取模板详情"""
+    def _fetch_and_parse_template(where_clause, params):
+        """
+        通用模板查询和解析方法
+
+        Args:
+            where_clause: WHERE 子句
+            params: 查询参数
+
+        Returns:
+            dict: 模板信息，不存在返回 None
+        """
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            cursor.execute('''
+            cursor.execute(f'''
                 SELECT id, name, description, config, is_default, created_at, updated_at
                 FROM report_templates
-                WHERE id = ?
-            ''', (template_id,))
-            
+                WHERE {where_clause}
+            ''', params)
             row = cursor.fetchone()
+
             if not row:
                 return None
-            
+
             template = dict(row)
             template['config'] = json.loads(template['config'])
-            
             return template
+
+    @staticmethod
+    def get_template(template_id):
+        """获取模板详情"""
+        return TemplateService._fetch_and_parse_template('id = ?', (template_id,))
 
     @staticmethod
     def get_template_by_name(name):
         """根据名称获取模板"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, name, description, config, is_default, created_at, updated_at
-                FROM report_templates
-                WHERE name = ?
-            ''', (name,))
-            
-            row = cursor.fetchone()
-            if not row:
-                return None
-            
-            template = dict(row)
-            template['config'] = json.loads(template['config'])
-            
-            return template
+        return TemplateService._fetch_and_parse_template('name = ?', (name,))
 
     @staticmethod
     def get_default_template():
         """获取默认模板"""
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, name, description, config, is_default, created_at, updated_at
-                FROM report_templates
-                WHERE is_default = 1
-                LIMIT 1
-            ''')
-            
-            row = cursor.fetchone()
-            if not row:
-                return None
-            
-            template = dict(row)
-            template['config'] = json.loads(template['config'])
-            
-            return template
+        return TemplateService._fetch_and_parse_template('is_default = 1 LIMIT 1', ())
 
     @staticmethod
     def update_template(template_id, name=None, description=None, config=None, is_default=None):

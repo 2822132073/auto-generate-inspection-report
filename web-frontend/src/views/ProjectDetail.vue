@@ -74,7 +74,7 @@
               </div>
               <div class="meta-item">
                 <el-icon><Document /></el-icon>
-                <span>{{ getHostInspectionCount(host.hostname) }} 次巡检</span>
+                <span>{{ hostInspectionCounts[host.hostname] || 0 }} 次巡检</span>
               </div>
             </div>
           </div>
@@ -252,11 +252,6 @@ const fetchHostInspectionCount = async (hostname) => {
     console.error('获取主机巡检次数失败:', error)
     hostInspectionCounts.value[hostname] = 0
   }
-}
-
-// 获取主机巡检次数
-const getHostInspectionCount = (hostname) => {
-  return hostInspectionCounts.value[hostname] || 0
 }
 
 // 获取模板列表

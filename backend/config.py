@@ -21,6 +21,9 @@ DATABASE_PATH = DATA_DIR / 'inspections.db'
 DEFAULT_FONT_FILE = 'OperatorMono-Medium.otf'
 DEFAULT_SCALE_FACTOR = 3
 
+# 截图配置
+SCREENSHOT_MAX_LINE_LENGTH = 160  # 每行最大字符数，超长自动换行
+
 # API 配置
 API_VERSION = 'v1'
 PAGE_SIZE_DEFAULT = 20

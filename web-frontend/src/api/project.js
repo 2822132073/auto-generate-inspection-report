@@ -1,51 +1,19 @@
-import request from './request'
+import { createApi } from './request'
 
 // 获取系统统计信息
-export function getStats() {
-  return request({
-    url: '/stats',
-    method: 'get'
-  })
-}
+export const getStats = createApi('/stats')
 
 // 获取项目列表
-export function getProjects(params) {
-  return request({
-    url: '/projects',
-    method: 'get',
-    params
-  })
-}
+export const getProjects = createApi('/projects')
 
 // 根据项目代码获取项目
-export function getProjectByCode(projectCode) {
-  return request({
-    url: `/projects/by-code/${projectCode}`,
-    method: 'get'
-  })
-}
+export const getProjectByCode = (code) => createApi(`/projects/by-code/${code}`)()
 
 // 获取项目统计信息
-export function getProjectStatistics(projectId) {
-  return request({
-    url: `/projects/${projectId}/statistics`,
-    method: 'get'
-  })
-}
+export const getProjectStatistics = (id) => createApi(`/projects/${id}/statistics`)()
 
 // 获取项目下的主机列表
-export function getProjectHosts(projectId) {
-  return request({
-    url: `/projects/${projectId}/hosts`,
-    method: 'get'
-  })
-}
+export const getProjectHosts = (id) => createApi(`/projects/${id}/hosts`)()
 
 // 创建项目
-export function createProject(data) {
-  return request({
-    url: '/projects',
-    method: 'post',
-    data
-  })
-}
+export const createProject = createApi('/projects', 'post')

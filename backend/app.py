@@ -11,36 +11,59 @@ import sys
 import os
 import signal
 import atexit
+import threading
+import time
 from pathlib import Path
 
 # 添加当前目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent))
 
 from utils.screenshot_generator import generate_screenshot_bytes
+from utils.logger import setup_logging, get_logger
 from models.database import init_database, get_db_connection
 from api.inspection_routes import inspection_bp
 from api.report_routes import report_bp
 from api.template_routes import template_bp
 from api.project_routes import project_bp
 from services.template_service import TemplateService
+from services.screenshot_task_service import ScreenshotTaskService
 from config import SCREENSHOTS_DIR, DATA_DIR, REPORTS_DIR, DATABASE_PATH
+
+# 初始化日志
+setup_logging()
+logger = get_logger('app')
 
 app = Flask(__name__)
 CORS(app)  # 启用跨域支持
 
-# 默认字体文件（在项目根目录）
-DEFAULT_FONT_FILE = str(Path(__file__).parent.parent / 'OperatorMono-Medium.otf')
-DEFAULT_SCALE_FACTOR = 3
-
 # 初始化数据库
-print("正在初始化数据库...")
+logger.info("正在初始化数据库...")
 init_database()
-print("数据库初始化完成！")
+logger.info("数据库初始化完成")
 
 # 初始化默认模板
-print("正在初始化默认报告模板...")
+logger.info("正在初始化默认报告模板...")
 TemplateService.init_default_templates()
-print("默认模板初始化完成！")
+logger.info("默认模板初始化完成")
+
+# 后台截图处理线程
+_screenshot_worker_running = True
+
+def screenshot_worker():
+    """后台截图处理线程"""
+    while _screenshot_worker_running:
+        try:
+            processed = ScreenshotTaskService.process_all_pending()
+            if processed > 0:
+                logger.info(f"后台处理了 {processed} 个截图任务")
+        except Exception as e:
+            logger.exception(f"截图处理错误: {e}")
+        time.sleep(5)  # 每 5 秒检查一次
+
+# 启动后台线程
+_worker_thread = threading.Thread(target=screenshot_worker, daemon=True, name="ScreenshotWorker")
+_worker_thread.start()
+logger.info("截图后台处理线程已启动")
 
 # 注册蓝图
 app.register_blueprint(inspection_bp, url_prefix='/api/v1')
@@ -230,14 +253,14 @@ if __name__ == '__main__':
     # 写入 PID 文件
     pid_file = Path(__file__).parent.parent / '.backend.pid'
     pid_file.write_text(str(os.getpid()))
-    print(f"后端进程 PID: {os.getpid()}")
+    logger.info(f"后端进程 PID: {os.getpid()}")
     
     # 定义清理函数
     def cleanup():
         """清理 PID 文件"""
         if pid_file.exists():
             pid_file.unlink()
-            print("\n后端服务已停止，PID 文件已清理")
+            logger.info("后端服务已停止，PID 文件已清理")
     
     # 注册退出时的清理函数
     atexit.register(cleanup)
@@ -245,7 +268,7 @@ if __name__ == '__main__':
     # 信号处理器
     def signal_handler(signum, frame):
         """处理终止信号"""
-        print(f"\n收到信号 {signum}，正在关闭服务器...")
+        logger.info(f"收到信号 {signum}，正在关闭服务器...")
         cleanup()
         sys.exit(0)
     
@@ -256,17 +279,17 @@ if __name__ == '__main__':
     try:
         port = int(os.environ.get('PORT', 5000))
         host = os.environ.get('HOST', '0.0.0.0')
-        print(f"正在启动服务器，监听 {host}:{port}...")
-        print(f"数据目录: {DATA_DIR.resolve()}")
-        print(f"截图目录: {SCREENSHOTS_DIR.resolve()}")
-        print(f"报告目录: {REPORTS_DIR.resolve()}")
-        print(f"数据库: {DATABASE_PATH.resolve()}")
-        print("按 Ctrl+C 停止服务")
+        logger.info(f"正在启动服务器，监听 {host}:{port}...")
+        logger.info(f"数据目录: {DATA_DIR.resolve()}")
+        logger.info(f"截图目录: {SCREENSHOTS_DIR.resolve()}")
+        logger.info(f"报告目录: {REPORTS_DIR.resolve()}")
+        logger.info(f"数据库: {DATABASE_PATH.resolve()}")
+        logger.info("按 Ctrl+C 停止服务")
         app.run(host=host, port=port, debug=False, use_reloader=False)
     except KeyboardInterrupt:
-        print("\n接收到键盘中断")
+        logger.info("接收到键盘中断")
         cleanup()
     except Exception as e:
-        print(f"\n服务器异常: {e}")
+        logger.exception(f"服务器异常: {e}")
         cleanup()
         raise

@@ -67,6 +67,14 @@
               <div class="header-right">
                 <el-tag size="small">{{ inspection.commands_count }} 个命令</el-tag>
                 <el-button
+                  size="small"
+                  type="primary"
+                  :loading="regeneratingIds.includes(inspection.id)"
+                  @click.stop="handleRegenerateScreenshots(inspection.id)"
+                >
+                  重新生成截图
+                </el-button>
+                <el-button
                   :icon="expandedIds.includes(inspection.id) ? 'ArrowUp' : 'ArrowDown'"
                   size="small"
                   text
@@ -193,7 +201,8 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getInspections, getInspectionDetail } from '@/api/inspection'
+import { ElMessage } from 'element-plus'
+import { getInspections, getInspectionDetail, regenerateScreenshots } from '@/api/inspection'
 import { formatDateTime } from '@/utils/date'
 
 const router = useRouter()
@@ -210,6 +219,23 @@ const hostInfo = ref(null)
 const expandedIds = ref([])
 const inspectionDetails = reactive({})
 const showEnv = reactive({})
+const regeneratingIds = ref([])
+
+// 重新生成截图
+const handleRegenerateScreenshots = async (id) => {
+  regeneratingIds.value.push(id)
+  try {
+    await regenerateScreenshots(id)
+    ElMessage.success('已触发截图重新生成，请稍后刷新查看')
+    // 刷新详情
+    delete inspectionDetails[id]
+    await fetchInspectionDetail(id)
+  } catch (error) {
+    ElMessage.error('触发失败: ' + (error.message || '未知错误'))
+  } finally {
+    regeneratingIds.value = regeneratingIds.value.filter(i => i !== id)
+  }
+}
 
 // 获取巡检记录列表
 const fetchInspections = async () => {

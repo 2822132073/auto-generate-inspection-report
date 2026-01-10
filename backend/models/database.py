@@ -45,6 +45,7 @@ def init_database():
             output TEXT,
             return_code INTEGER DEFAULT 0,
             screenshot_path VARCHAR(500),
+            screenshot_status VARCHAR(20) DEFAULT 'pending',
             execution_order INTEGER,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (record_id) REFERENCES inspection_records(id) ON DELETE CASCADE
@@ -52,6 +53,17 @@ def init_database():
     ''')
 
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_record_id ON command_executions(record_id)')
+
+    # 迁移：为旧表添加 screenshot_status 字段
+    cursor.execute("PRAGMA table_info(command_executions)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'screenshot_status' not in columns:
+        cursor.execute("ALTER TABLE command_executions ADD COLUMN screenshot_status VARCHAR(20) DEFAULT 'pending'")
+        # 已有截图的设为 completed，没有的设为 skipped
+        cursor.execute("UPDATE command_executions SET screenshot_status = 'completed' WHERE screenshot_path IS NOT NULL")
+        cursor.execute("UPDATE command_executions SET screenshot_status = 'skipped' WHERE screenshot_path IS NULL")
+
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_screenshot_status ON command_executions(screenshot_status)')
 
     # 创建 report_generations 表（报告生成记录）
     cursor.execute('''

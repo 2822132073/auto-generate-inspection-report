@@ -5,7 +5,6 @@
 
 import json
 from models.database import get_db_connection
-from services.screenshot_service import ScreenshotService
 from config import SCREENSHOTS_DIR
 
 
@@ -26,6 +25,7 @@ class InspectionService:
             dict: 创建的记录信息
         """
         options = options or {}
+        generate_screenshots = options.get('generate_screenshots', True)
 
         with get_db_connection() as conn:
             cursor = conn.cursor()
@@ -51,42 +51,25 @@ class InspectionService:
 
             # 插入命令执行记录
             commands = data.get('commands', {})
-            screenshots_generated = 0
+            screenshot_status = 'pending' if generate_screenshots else 'skipped'
 
             for idx, (cmd_key, cmd_data) in enumerate(commands.items(), 1):
                 command = cmd_data.get('command', '')
                 output = cmd_data.get('output', '')
                 return_code = cmd_data.get('return_code', 0)
 
-                # 生成截图（如果启用）
-                screenshot_path = None
-                if options.get('generate_screenshots', True):
-                    try:
-                        screenshot_path = ScreenshotService.generate_and_save(
-                            record_id=record_id,
-                            env=data.get('env', {}),
-                            command=command,
-                            output=output,
-                            return_code=return_code,
-                            order=idx
-                        )
-                        screenshots_generated += 1
-                    except Exception as e:
-                        print(f"生成截图失败: {e}")
-
-                # 插入命令记录
                 cursor.execute('''
                     INSERT INTO command_executions
-                    (record_id, command, output, return_code, screenshot_path, execution_order)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (record_id, command, output, return_code, screenshot_path, idx))
+                    (record_id, command, output, return_code, screenshot_path, screenshot_status, execution_order)
+                    VALUES (?, ?, ?, ?, NULL, ?, ?)
+                ''', (record_id, command, output, return_code, screenshot_status, idx))
 
             return {
                 'id': record_id,
                 'hostname': metadata.get('hostname'),
                 'timestamp': metadata.get('timestamp'),
                 'commands_count': len(commands),
-                'screenshots_generated': screenshots_generated
+                'screenshots_pending': len(commands) if generate_screenshots else 0
             }
 
     @staticmethod

@@ -2,13 +2,26 @@
 报告生成和下载 API 路由
 """
 
+from functools import wraps
 from flask import Blueprint, request, jsonify, send_file
 from services.report_service import ReportService
 from services.inspection_service import InspectionService
 from services.project_service import ProjectService
 from config import REPORTS_DIR
+from utils.logger import get_logger
+
+logger = get_logger('api.report')
 
 report_bp = Blueprint('reports', __name__)
+
+
+def resolve_query_project_id(project_identifier):
+    """
+    解析并返回用于查询的项目ID
+    优先使用解析后的项目代码，否则使用原始标识符（向后兼容）
+    """
+    _, project_code = ProjectService.resolve_project_id(project_identifier)
+    return project_code if project_code else project_identifier
 
 
 @report_bp.route('/projects/<project_id>/hosts', methods=['GET'])
@@ -18,27 +31,23 @@ def get_project_hosts(project_id):
     支持通过项目 ID、项目代码或项目名称查询
     """
     try:
-        # 解析项目标识符，获取项目代码
-        _, project_code = ProjectService.resolve_project_id(project_id)
-        
-        # 如果解析失败，尝试直接使用原始 project_id（向后兼容）
-        query_project_id = project_code if project_code else project_id
-        
+        query_project_id = resolve_query_project_id(project_id)
         records = InspectionService.get_project_latest_hosts(query_project_id)
 
         # 提取主机信息
-        hosts = []
-        for record in records:
-            hosts.append({
-                'hostname': record['hostname'],
-                'ip': record.get('ip'),
-                'os': record.get('os'),
-                'kernel': record.get('kernel'),
-                'arch': record.get('arch'),
-                'timestamp': record['timestamp'],
-                'latest_timestamp': record['timestamp'],
-                'record_id': record['id']
-            })
+        hosts = [
+            {
+                'hostname': r['hostname'],
+                'ip': r.get('ip'),
+                'os': r.get('os'),
+                'kernel': r.get('kernel'),
+                'arch': r.get('arch'),
+                'timestamp': r['timestamp'],
+                'latest_timestamp': r['timestamp'],
+                'record_id': r['id']
+            }
+            for r in records
+        ]
 
         return jsonify({
             'success': True,
@@ -50,6 +59,7 @@ def get_project_hosts(project_id):
         }), 200
 
     except Exception as e:
+        logger.exception(f"获取项目主机列表异常: project_id={project_id}, {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -58,7 +68,7 @@ def generate_project_report(project_id):
     """
     生成项目巡检报告
     支持通过项目 ID、项目代码或项目名称查询
-    
+
     请求体:
     {
         "options": {
@@ -71,14 +81,11 @@ def generate_project_report(project_id):
     try:
         body = request.get_json() or {}
         options = body.get('options', {})
-        template_id = body.get('template_id')  # 支持模板ID
+        template_id = body.get('template_id')
 
-        # 解析项目标识符，获取项目代码
         project_db_id, project_code = ProjectService.resolve_project_id(project_id)
-        
-        # 如果解析成功，使用项目代码；否则使用原始 project_id（向后兼容）
         query_project_id = project_code if project_code else project_id
-        
+
         # 如果解析到了项目信息，将项目名称添加到 options 中
         if project_db_id:
             project_info = ProjectService.get_project(project_db_id)
@@ -106,8 +113,10 @@ def generate_project_report(project_id):
         }), 201
 
     except ValueError as e:
+        logger.warning(f"生成项目报告失败: project_id={project_id}, {e}")
         return jsonify({'success': False, 'error': str(e)}), 404
     except Exception as e:
+        logger.exception(f"生成项目报告异常: project_id={project_id}, {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -118,11 +127,7 @@ def download_project_report(project_id):
     支持通过项目 ID、项目代码或项目名称查询
     """
     try:
-        # 解析项目标识符
-        _, project_code = ProjectService.resolve_project_id(project_id)
-        query_project_id = project_code if project_code else project_id
-        
-        # 获取最新报告路径
+        query_project_id = resolve_query_project_id(project_id)
         report_path = ReportService.get_latest_project_report(query_project_id)
 
         if not report_path:
@@ -141,4 +146,5 @@ def download_project_report(project_id):
         )
 
     except Exception as e:
+        logger.exception(f"下载项目报告异常: project_id={project_id}, {e}")
         return jsonify({'success': False, 'error': str(e)}), 500

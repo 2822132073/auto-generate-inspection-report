@@ -4,12 +4,16 @@
 使用 Playwright 将 JSON 中的命令执行记录渲染成终端截图
 """
 
+import html
 import json
-import os
 import sys
 import base64
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+from utils.logger import get_logger
+from config import SCREENSHOT_MAX_LINE_LENGTH
+
+logger = get_logger('utils.screenshot_generator')
 
 
 def parse_ps1(ps1_template, env):
@@ -87,15 +91,20 @@ def parse_ps1(ps1_template, env):
     
     # \w -> 完整路径（支持 ~ 缩写）
     pwd = env.get('PWD', '/')
-    home = env.get('HOME', '/')
-    if pwd.startswith(home):
+    home = env.get('HOME')
+    # root 用户默认 HOME 为 /root
+    if not home and env.get('USER') == 'root':
+        home = '/root'
+    if not home:
+        home = '/'
+    if pwd.startswith(home) and home != '/':
         pwd_display = '~' + pwd[len(home):]
     else:
         pwd_display = pwd
     prompt = prompt.replace('\\w', pwd_display)
     
     # \W -> 当前目录名（从完整路径提取）
-    dirname = os.path.basename(pwd) if pwd != '/' else '/'
+    dirname = Path(pwd).name if pwd != '/' else '/'
     prompt = prompt.replace('\\W', dirname)
     
     # \$ -> $ 或 #（根据用户是否为 root）
@@ -117,12 +126,31 @@ def parse_ps1(ps1_template, env):
 
 def escape_html(text):
     """转义 HTML 特殊字符"""
-    return (text
-            .replace('&', '&amp;')
-            .replace('<', '&lt;')
-            .replace('>', '&gt;')
-            .replace('"', '&quot;')
-            .replace("'", '&#39;'))
+    return html.escape(text, quote=True)
+
+
+def wrap_text(text, max_length=SCREENSHOT_MAX_LINE_LENGTH):
+    """
+    将超长文本按指定字符数换行
+
+    Args:
+        text: 原始文本
+        max_length: 每行最大字符数
+
+    Returns:
+        str: 处理后的文本，超长部分会换行
+    """
+    if not text:
+        return text
+
+    lines = []
+    for line in text.split('\n'):
+        while len(line) > max_length:
+            lines.append(line[:max_length])
+            line = line[max_length:]
+        lines.append(line)
+
+    return '\n'.join(lines)
 
 
 def load_font_as_base64(font_path):
@@ -231,19 +259,32 @@ def generate_single_command_html(env, command, output, return_code, font_base64)
     html_parts.append('<div class="terminal">')
     
     # 提示符行（确保提示符和命令之间有一个空格）
-    html_parts.append(f'<div class="line"><span class="prompt">{escape_html(prompt)}</span> <span class="command">{escape_html(command)}</span></div>')
+    prompt_escaped = escape_html(prompt)
+    full_prompt_line = f"{prompt} {command}"
+    if len(full_prompt_line) > SCREENSHOT_MAX_LINE_LENGTH:
+        # 命令行超长，需要换行
+        wrapped_command = wrap_text(command, SCREENSHOT_MAX_LINE_LENGTH)
+        cmd_lines = wrapped_command.split('\n')
+        for i, cmd_line in enumerate(cmd_lines):
+            if i == 0:
+                html_parts.append(f'<div class="line"><span class="prompt">{prompt_escaped}</span> <span class="command">{escape_html(cmd_line)}</span></div>')
+            else:
+                html_parts.append(f'<div class="line"><span class="command">{escape_html(cmd_line)}</span></div>')
+    else:
+        html_parts.append(f'<div class="line"><span class="prompt">{prompt_escaped}</span> <span class="command">{escape_html(command)}</span></div>')
     
-    # 输出行
-    if output:
+    # 输出行（return_code 为 1 时不显示输出）
+    if output and return_code != 1:
         output_lines = output.split('\n')
         for line in output_lines:
-            # 保留所有行，包括空行
-            html_parts.append(f'<div class="line"><span class="output">{escape_html(line)}</span></div>')
+            # 对每行输出进行长度限制
+            wrapped_lines = wrap_text(line, SCREENSHOT_MAX_LINE_LENGTH).split('\n')
+            for wrapped_line in wrapped_lines:
+                html_parts.append(f'<div class="line"><span class="output">{escape_html(wrapped_line)}</span></div>')
     
-    # 如果返回码非 0，显示错误信息
-    if return_code != 0:
-        html_parts.append(f'<div class="line"><span class="error">[返回码: {return_code}]</span></div>')
-    
+    # 如果返回码非 0，显示错误信息（已禁用）
+    # if return_code != 0:
+    #     html_parts.append(f'<div class="line"><span class="error">[返回码: {return_code}]</span></div>')
     html_parts.append('</div>')
     html_parts.append('</body>')
     html_parts.append('</html>')
@@ -389,7 +430,7 @@ def generate_screenshot(json_file='test.json', output_dir='output', font_file='O
     try:
         font_base64 = load_font_as_base64(str(font_path))
     except FileNotFoundError:
-        print(f"警告: 字体文件 {font_path} 不存在，使用默认字体", file=sys.stderr)
+        logger.warning(f"字体文件 {font_path} 不存在，使用默认字体")
     
     # 创建输出目录
     output_path = Path(output_dir)
@@ -483,13 +524,13 @@ def generate_screenshot(json_file='test.json', output_dir='output', font_file='O
             # 获取实际截图尺寸（由于 device_scale_factor=2，实际尺寸是视口的 2 倍）
             actual_width = viewport_width * 2
             actual_height = viewport_height * 2
-            print(f"终端截图已保存到: {output_file} (视口: {viewport_width}x{viewport_height}, 实际分辨率: {actual_width}x{actual_height})")
+            logger.debug(f"终端截图已保存到: {output_file} (视口: {viewport_width}x{viewport_height}, 实际分辨率: {actual_width}x{actual_height})")
             command_index += 1
-        
+
         # 关闭浏览器
         browser.close()
-    
-    print(f"\n所有截图已生成，共 {command_index - 1} 个文件，保存在目录: {output_dir}")
+
+    logger.info(f"所有截图已生成，共 {command_index - 1} 个文件，保存在目录: {output_dir}")
 
 
 if __name__ == '__main__':
@@ -501,6 +542,6 @@ if __name__ == '__main__':
     try:
         generate_screenshot(json_file, output_dir, font_file)
     except Exception as e:
-        print(f"错误: {e}", file=sys.stderr)
+        logger.error(f"截图生成失败: {e}")
         sys.exit(1)
 

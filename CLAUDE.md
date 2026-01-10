@@ -6,116 +6,102 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-一个基于 Python + Playwright 的服务器巡检报告生成系统，支持：
-- 终端截图生成：将命令执行记录转换为高质量终端截图
-- 数据存储：SQLite 数据库存储巡检记录
-- 报告生成：自动生成 DOCX 格式的项目巡检报告
-- HTTP API：完整的 RESTful API 接口
+一个基于 Python + Playwright + Vue.js 的服务器巡检报告生成系统，支持：
+- **终端截图生成**：将命令执行记录转换为高质量终端截图
+- **数据存储**：SQLite 数据库存储巡检记录
+- **报告生成**：自动生成 DOCX 格式的项目巡检报告
+- **异步截图**：后台任务队列处理截图生成（`screenshot_status: pending/processing/completed/failed/skipped`）
+- **项目管理**：支持多项目、多主机的巡检管理
+- **报告模板**：可配置的报告模板系统
+- **HTTP API + Web UI**：完整的 RESTful API 和 Vue.js 前端
 
 **核心特性**：支持多主机项目巡检，报告自动汇总每个主机的最新数据（按 timestamp 排序）。
 
-## Development Setup
+## Common Commands
 
-### Virtual Environment
-
-The project uses a Python virtual environment located in `venv/`:
+### 一键启动（推荐）
 
 ```bash
-# Activate virtual environment
-source venv/bin/activate  # macOS/Linux
-venv\Scripts\activate     # Windows
+./start-all.sh    # 同时启动后端(8000)和前端(5173)
+./stop-all.sh     # 停止所有服务
+```
 
-# Install dependencies
-pip install -r requirements.txt
+### 后端开发
+
+```bash
+# 进入后端目录
+cd backend
+
+# 激活虚拟环境
+source ../venv/bin/activate
+
+# 启动后端服务（自动初始化数据库和默认模板）
+# 默认端口 8000（macOS 上 5000 端口被 AirPlay 占用）
+PORT=8000 python app.py
+
+# 安装依赖
+pip install -r ../requirements.txt
 playwright install chromium
 ```
 
-### Dependencies
+**注意**：入口文件是 `backend/app.py`，而非项目根目录的 `api_server.py`（README 中的旧文档）。
 
-- `playwright>=1.40.0` - Browser automation for rendering HTML to screenshots
-- `flask>=2.3.0` - HTTP API server framework
-
-## Common Commands
-
-### 初始化和启动
+### 前端开发
 
 ```bash
-# 初始化数据库（仅首次或手动重置时需要）
-python init_db.py
-
-# 启动 HTTP API 服务（会自动初始化数据库）
-python api_server.py
-
-# 使用环境变量配置
-PORT=8080 HOST=127.0.0.1 python api_server.py
+cd web-frontend
+npm install       # 首次安装
+npm run dev       # 启动开发服务器 (默认 5173)
 ```
 
-### 巡检数据管理
+### 数据库
 
-```bash
-# 提交巡检数据
-curl -X POST http://localhost:5000/api/v1/inspections \
-  -H "Content-Type: application/json" \
-  -d @test.json
-
-# 查询巡检记录（分页）
-curl "http://localhost:5000/api/v1/inspections?page=1&page_size=20"
-
-# 按项目筛选
-curl "http://localhost:5000/api/v1/inspections?project_id=project-001"
-
-# 按主机筛选
-curl "http://localhost:5000/api/v1/inspections?hostname=node-1"
-
-# 获取详情
-curl http://localhost:5000/api/v1/inspections/1
-
-# 删除记录
-curl -X DELETE http://localhost:5000/api/v1/inspections/1
-```
-
-### 项目报告生成
-
-```bash
-# 查看项目主机列表
-curl http://localhost:5000/api/v1/projects/project-001/hosts
-
-# 生成项目报告（汇总所有主机最新数据）
-curl -X POST http://localhost:5000/api/v1/projects/project-001/report \
-  -H "Content-Type: application/json" \
-  -d '{"options": {"include_screenshots": true}}'
-
-# 下载项目报告
-curl http://localhost:5000/api/v1/projects/project-001/report \
-  -o project_report.docx
-```
-
-### 系统信息
-
-```bash
-# 健康检查
-curl http://localhost:5000/health
-
-# 统计信息
-curl http://localhost:5000/api/v1/stats
-```
-
-### 命令行工具（原有功能）
-
-```bash
-# Basic usage with defaults (reads test.json, outputs to output/)
-python generate_terminal_screenshot.py
-
-# Specify custom input file and output directory
-python generate_terminal_screenshot.py <json_file> <output_dir>
-
-# 使用自定义字体
-python generate_terminal_screenshot.py test.json output CustomFont.otf
-```
+数据库位于 `backend/data/inspections.db`，启动时自动初始化，无需手动操作。
 
 ## Architecture
 
-### 分层架构设计
+### 项目结构
+
+```
+.
+├── backend/                    # 后端代码
+│   ├── app.py                  # Flask 应用入口（含后台截图线程）
+│   ├── config.py               # 全局配置
+│   ├── models/                 # 数据模型层
+│   │   └── database.py         # SQLite 初始化和连接管理
+│   ├── services/               # 业务服务层
+│   │   ├── inspection_service.py
+│   │   ├── screenshot_service.py
+│   │   ├── screenshot_task_service.py  # 异步截图处理
+│   │   ├── report_service.py
+│   │   ├── project_service.py
+│   │   └── template_service.py
+│   ├── api/                    # API 路由层
+│   │   ├── inspection_routes.py
+│   │   ├── report_routes.py
+│   │   ├── project_routes.py
+│   │   └── template_routes.py
+│   └── utils/                  # 工具层
+│       ├── logger.py           # 统一日志配置
+│       └── screenshot_generator.py  # Playwright 截图核心
+│
+├── web-frontend/               # Vue.js 前端
+│   └── src/
+│       ├── api/                # API 调用封装
+│       ├── views/              # 页面组件
+│       └── router/             # 路由配置
+│
+├── data/                       # 数据目录（自动创建）
+│   ├── inspections.db          # SQLite 数据库
+│   ├── screenshots/            # 截图存储（按 YYYY-MM/ 组织）
+│   └── reports/                # 报告存储（按 YYYY-MM/ 组织）
+│
+├── venv/                       # Python 虚拟环境
+├── start-all.sh                # 一键启动脚本
+└── stop-all.sh                 # 停止服务脚本
+```
+
+### 分层架构
 
 ```
 配置层 (config.py)
@@ -126,174 +112,112 @@ python generate_terminal_screenshot.py test.json output CustomFont.otf
     ↓
 API 路由层 (api/)
     ↓
-HTTP 服务器 (api_server.py)
+HTTP 服务器 (app.py)
+    ↓
+前端 (web-frontend/)
 ```
 
-### Core Components
+### 代码模式
 
-**config.py** - 全局配置管理：
-- 定义路径常量（DATA_DIR, SCREENSHOTS_DIR, REPORTS_DIR, DATABASE_PATH）
-- API 配置（分页大小、版本）
-- 报告配置（标题、截图宽度）
-- 自动创建必要目录
+**后端 API 路由**：使用统一异常处理装饰器
+```python
+def handle_api_error(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except ValueError as e:
+            logger.warning(f"操作失败: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 400
+        except Exception as e:
+            logger.exception(f"操作异常: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    return wrapper
 
-**models/database.py** - 数据库层：
-- `init_database()`: 创建表和索引（inspection_records, command_executions, report_generations）
-- `get_db_connection()`: 上下文管理器，自动处理连接、事务、回滚
-
-**services/screenshot_service.py** - 截图服务：
-- `generate_and_save()`: 封装现有截图生成功能，保存到文件系统（按月份组织）
-
-**services/inspection_service.py** - 巡检服务：
-- `create_inspection()`: 保存巡检记录 + 命令 + 生成截图
-- `get_inspections()`: 分页查询，支持多条件筛选
-- `get_inspection_detail()`: 获取详情（包含所有命令）
-- `delete_inspection()`: 删除记录和关联截图文件
-- `get_project_latest_hosts()`: **核心方法** - 获取项目下每个主机的最新记录
-
-**services/report_service.py** - 报告服务：
-- `generate_project_report()`: 生成项目报告，按主机分章节
-  - 调用 `get_project_latest_hosts()` 获取每个主机的最新数据
-  - 使用 python-docx 生成 DOCX 文档
-  - 支持中文字体（SimSun）
-  - 嵌入截图和文本输出
-- `_to_chinese_number()`: 数字转中文（一、二、三...）
-
-**api/inspection_routes.py** - 巡检路由：
-- `POST /api/v1/inspections`: 创建巡检记录
-- `GET /api/v1/inspections`: 查询列表（分页、筛选）
-- `GET /api/v1/inspections/<id>`: 获取详情
-- `DELETE /api/v1/inspections/<id>`: 删除记录
-
-**api/report_routes.py** - 报告路由：
-- `GET /api/v1/projects/<project_id>/hosts`: 获取项目主机列表
-- `POST /api/v1/projects/<project_id>/report`: 生成项目报告
-- `GET /api/v1/projects/<project_id>/report`: 下载最新报告
-
-**api_server.py** - Flask 应用：
-- 注册蓝图（inspection_bp, report_bp）
-- 启动时自动初始化数据库
-- 提供系统统计端点（/api/v1/stats）
-- 保留原有截图生成端点（/generate）
-
-**generate_terminal_screenshot.py** - 截图生成核心（原有功能，保持不变）：
-- `parse_ps1()`: Parses bash PS1 prompt templates, handling escape sequences (`\u`, `\h`, `\w`, `\W`, `\$`) and bash conditional expressions (`${var:+value}`, `${var:-value}`)
-- `generate_single_command_html()`: Generates HTML representation of a terminal with prompt, command, and output
-- `generate_screenshot_bytes()`: 渲染 HTML 到 PNG 使用 Playwright，返回字节流（API 使用）
-- `generate_screenshot()`: 批量处理 JSON 文件，保存到文件（CLI 使用）
-- `load_font_as_base64()`: 嵌入字体文件为 base64 data URI，确保一致渲染
-
-### Data Flow
-
-#### 巡检数据提交流程
-
-```
-客户端提交 JSON
-    ↓
-inspection_routes.create_inspection()
-    ↓
-InspectionService.create_inspection()
-    ↓
-1. 保存 inspection_records（主记录）
-2. 遍历 commands，对每个命令：
-   - ScreenshotService.generate_and_save()
-     → generate_screenshot_bytes() 生成截图
-     → 保存到 data/screenshots/YYYY-MM/
-   - 保存 command_executions（命令记录）
-    ↓
-返回创建结果
+@inspection_bp.route('/inspections', methods=['POST'])
+@handle_api_error
+def create_inspection():
+    # 无需 try-catch，由装饰器处理
+    ...
 ```
 
-#### 项目报告生成流程
+**前端 API 调用**：使用 `createApi` 辅助函数
+```javascript
+// web-frontend/src/api/request.js
+export function createApi(url, method = 'get') {
+  return (data, config) => {
+    const params = method === 'get' ? { params: data } : { data }
+    return request({ url, method, ...params, ...config })
+  }
+}
 
-```
-请求生成项目报告
-    ↓
-report_routes.generate_project_report()
-    ↓
-ReportService.generate_project_report()
-    ↓
-1. InspectionService.get_project_latest_hosts(project_id)
-   → SQL 查询：按 hostname 分组，选择每组 timestamp 最大的记录
-   → 返回每个主机的最新巡检数据
-2. 创建 DOCX 文档
-   - 设置中文字体（SimSun + qn('w:eastAsia')）
-   - 按主机分章节循环：
-     a. 章节标题（一、二、三...）
-     b. 基本信息表格
-     c. 遍历命令，插入：
-        - 返回码
-        - 文本输出（Consolas 等宽字体）
-        - 截图（从 SCREENSHOTS_DIR 加载）
-3. 保存到 data/reports/YYYY-MM/
-4. 记录到 report_generations 表
-    ↓
-返回报告信息（路径、大小、主机数）
+// 使用示例
+export const getInspections = createApi('/inspections')
+export const createProject = createApi('/projects', 'post')
 ```
 
-### Key Design Decisions
+### 核心：异步截图处理
 
-**多主机最新记录查询**：使用 SQL 子查询实现，确保每个主机只显示最新数据：
+截图生成从同步改为异步，避免 API 请求超时：
+
+1. **提交巡检** → 命令记录的 `screenshot_status` 设为 `pending` 或 `skipped`
+2. **后台线程** (`ScreenshotTaskService.process_all_pending()`) 每 5 秒扫描待处理任务
+3. **状态流转**：`pending` → `processing` → `completed/failed`
+
+### 数据库表结构
+
+| 表名 | 说明 |
+|------|------|
+| `inspection_records` | 巡检记录主表 |
+| `command_executions` | 命令执行记录（含 `screenshot_status`） |
+| `report_generations` | 报告生成记录 |
+| `report_templates` | 报告模板配置 |
+| `projects` | 项目管理表 |
+
+### 关键业务逻辑
+
+**多主机最新记录查询**：报告生成时，使用 SQL 子查询获取每个主机的最新数据：
+
 ```sql
-SELECT ir.*
-FROM inspection_records ir
+SELECT ir.* FROM inspection_records ir
 INNER JOIN (
     SELECT hostname, MAX(timestamp) as max_timestamp
-    FROM inspection_records
-    WHERE project_id = ?
+    FROM inspection_records WHERE project_id = ?
     GROUP BY hostname
 ) latest ON ir.hostname = latest.hostname
-          AND ir.timestamp = latest.max_timestamp
+    AND ir.timestamp = latest.max_timestamp
 WHERE ir.project_id = ?
 ORDER BY ir.hostname
 ```
 
-**文件存储策略**：
-- 截图和报告按月份组织（YYYY-MM/），避免单目录文件过多
-- 数据库存储相对路径，便于迁移
-- 删除记录时级联删除文件
+**项目标识符解析** (`ProjectService.resolve_project_id()`)：支持通过项目ID、项目代码、项目名称三种方式查询项目。
 
-**事务管理**：`get_db_connection()` 上下文管理器自动处理：
-- 成功时自动 commit
-- 异常时自动 rollback
-- 始终 close 连接
+**日志规范**：
+- API 层：`api.{模块名}` (如 `api.inspection`)
+- 服务层：`services.{服务名}`
+- 工具层：`utils.{工具名}`
+- 级别：`info`（操作成功）、`warning`（业务警告）、`error`（错误）、`exception`（异常+堆栈）、`debug`（调试）
 
-**中文支持**：
-- JSON 存储使用 `ensure_ascii=False`
-- DOCX 使用 SimSun 字体并设置 `qn('w:eastAsia')`
-- 章节编号使用中文数字（一、二、三...）
+## API 端点
 
-## File Structure
-
-```
-.
-├── config.py                        # 全局配置
-├── generate_terminal_screenshot.py  # 截图生成核心
-├── api_server.py                    # HTTP API 服务器
-├── init_db.py                       # 数据库初始化脚本
-├── requirements.txt                 # Python 依赖
-├── OperatorMono-Medium.otf          # 默认字体文件
-├── test.json                        # 示例 JSON 文件
-├── models/                          # 数据模型层
-│   ├── __init__.py
-│   └── database.py                  # 数据库初始化和连接
-├── services/                        # 业务服务层
-│   ├── __init__.py
-│   ├── inspection_service.py        # 巡检数据处理
-│   ├── screenshot_service.py        # 截图生成服务
-│   └── report_service.py            # 报告生成服务
-├── api/                             # API 路由层
-│   ├── __init__.py
-│   ├── inspection_routes.py         # 巡检相关路由
-│   └── report_routes.py             # 报告相关路由
-├── data/                            # 数据目录（自动创建）
-│   ├── inspections.db               # SQLite 数据库
-│   ├── screenshots/                 # 截图存储（按月份）
-│   └── reports/                     # 报告存储（按月份）
-├── output/                          # CLI 输出目录（旧功能）
-├── README.md                        # 项目文档
-└── venv/                            # Python 虚拟环境
-```
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `POST` | `/api/v1/inspections` | 创建巡检记录 |
+| `GET` | `/api/v1/inspections` | 查询列表（分页、筛选） |
+| `GET` | `/api/v1/inspections/{id}` | 获取详情 |
+| `DELETE` | `/api/v1/inspections/{id}` | 删除记录 |
+| `GET` | `/api/v1/inspections/{id}/screenshot-status` | 查询截图生成状态 |
+| `POST` | `/api/v1/inspections/{id}/regenerate-screenshots` | 重新生成截图 |
+| `GET` | `/api/v1/projects` | 项目列表 |
+| `POST` | `/api/v1/projects` | 创建项目 |
+| `GET` | `/api/v1/projects/{id}/hosts` | 获取项目主机列表 |
+| `POST` | `/api/v1/projects/{id}/report` | 生成项目报告 |
+| `GET` | `/api/v1/projects/{id}/report` | 下载最新报告 |
+| `GET` | `/api/v1/templates` | 模板列表 |
+| `POST` | `/api/v1/templates` | 创建模板 |
+| `GET` | `/health` | 健康检查 |
+| `GET` | `/api/v1/stats` | 系统统计 |
+| `GET` | `/api/v1/screenshots/{path}` | 访问截图文件 |
 
 ## Input JSON Format
 
@@ -303,7 +227,6 @@ ORDER BY ir.hostname
     "env": {
       "USER": "root",
       "PWD": "/root",
-      "HOME": "/root",
       "HOSTNAME": "node-1",
       "PS1": "\\[\\e]0;\\u@\\h: \\w\\a\\]${debian_chroot:+($debian_chroot)}\\u@\\h:\\w\\$ "
     },
@@ -315,39 +238,36 @@ ORDER BY ir.hostname
       }
     }
   },
-  "metadata": { ... }
-}
-```
-
-## API Request Format
-
-```json
-{
-  "env": { "USER": "root", "PWD": "/root", "HOSTNAME": "node-1", "PS1": "..." },
-  "command": { "command": "free -h", "output": "...", "return_code": 0 },
-  "font_file": "OperatorMono-Medium.otf",  // Optional
-  "scale_factor": 3  // Optional, default 3
+  "metadata": {
+    "project_id": "project-001",
+    "ip": "192.168.1.10",
+    "timestamp": "2026-01-08T10:00:00Z",
+    "hostname": "node-1",
+    "os": "Linux",
+    "kernel": "5.15.0",
+    "arch": "x86_64"
+  },
+  "options": {
+    "generate_screenshots": true,  // true=异步生成, false=跳过
+    "notes": "定期巡检"
+  }
 }
 ```
 
 ## Important Notes
 
-### 业务逻辑
-- **多主机项目**：一个项目包含多台主机，每台主机可多次上传巡检数据
-- **最新数据**：报告生成时，自动选择每个主机 timestamp 最新的记录
-- **自动截图**：提交巡检数据时默认生成截图，可通过 `generate_screenshots: false` 禁用
-- **按月归档**：截图和报告文件按月份组织（YYYY-MM/），便于管理
+1. **字体文件**：`OperatorMono-Medium.otf` 必须放在项目根目录
+2. **文件存储**：截图和报告按月份组织（`YYYY-MM/`），数据库存相对路径
+3. **级联删除**：删除巡检记录会自动删除关联的截图文件
+4. **外键约束**：数据库启用 `PRAGMA foreign_keys = ON`
+5. **中文支持**：JSON 用 `ensure_ascii=False`，DOCX 用 SimSun 字体
 
-### 技术细节
-- 字体文件必须放在项目根目录
-- 默认字体 `OperatorMono-Medium.otf` 是必需的（除非指定其他字体）
-- 截图分辨率由 `scale_factor` 控制（默认 3x，适合高清显示）
-- API 启动时自动初始化数据库，无需手动运行 init_db.py
-- 删除巡检记录时会级联删除关联的截图文件
-- 数据库启用外键约束（PRAGMA foreign_keys = ON）
+## 环境变量
 
-### 开发建议
-- 修改数据库 schema：更新 models/database.py 中的 CREATE TABLE 语句
-- 添加新 API 端点：在 api/ 目录创建新蓝图，在 api_server.py 注册
-- 修改报告格式：编辑 services/report_service.py 中的 generate_project_report()
-- 添加新的巡检字段：更新 inspection_records 表和相关服务层代码
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `HOST` | 0.0.0.0 | 后端监听地址 |
+| `PORT` | 8000 | 后端端口（macOS 上避免使用 5000，被 AirPlay 占用） |
+| `BACKEND_PORT` | 8000 | start-all.sh 后端端口 |
+| `FRONTEND_PORT` | 5173 | start-all.sh 前端端口 |
+| `VITE_API_BASE_URL` | /api/v1 | 前端 API 基础路径 |

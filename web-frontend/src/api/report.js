@@ -1,23 +1,12 @@
-import request from './request'
+import request, { createApi } from './request'
 
 // 获取模板列表
-export function getTemplates() {
-  return request({
-    url: '/templates',
-    method: 'get'
-  })
-}
+export const getTemplates = createApi('/templates')
 
 // 生成报告
-export function generateReport(projectId, data) {
-  return request({
-    url: `/projects/${projectId}/report`,
-    method: 'post',
-    data
-  })
-}
+export const generateReport = (id, data) => createApi(`/projects/${id}/report`, 'post')(data)
 
-// 下载报告
+// 下载报告（需要特殊配置 responseType）
 export function downloadReport(projectId) {
   return request({
     url: `/projects/${projectId}/report`,

@@ -116,7 +116,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProjects, getStats, createProject } from '@/api/project'
+import { getProjects, getStats, createProject, getProjectHosts } from '@/api/project'
 import { formatDate } from '@/utils/date'
 import { truncateText } from '@/utils/format'
 import { ElMessage } from 'element-plus'
@@ -159,12 +159,17 @@ const fetchProjects = async () => {
   try {
     const res = await getProjects({ status: 'all' })
     projects.value = res.data.projects || []
-    
+
     // 获取每个项目的主机数量
-    // 这里简化处理,实际可以通过统计接口获取
-    projects.value.forEach(project => {
-      hostCounts.value[project.project_code] = 0
-    })
+    for (const project of projects.value) {
+      try {
+        const hostsRes = await getProjectHosts(project.project_code)
+        hostCounts.value[project.project_code] = hostsRes.data.host_count || 0
+      } catch (error) {
+        console.error(`获取项目 ${project.project_code} 主机数量失败:`, error)
+        hostCounts.value[project.project_code] = 0
+      }
+    }
   } catch (error) {
     console.error('获取项目列表失败:', error)
   } finally {

@@ -97,82 +97,81 @@ class ProjectService:
             }
 
     @staticmethod
-    def get_project(project_id):
+    def _get_project_by_field(field_name, field_value, single=True):
         """
-        获取项目详情（通过ID）
-        
+        通用项目查询方法
+
         Args:
-            project_id: 项目ID
-            
+            field_name: 字段名 (id, project_code, project_name)
+            field_value: 字段值
+            single: 是否返回单个结果（True）或列表（False，仅用于模糊查询）
+
         Returns:
-            dict: 项目信息，不存在返回 None
+            dict 或 list: 项目信息
         """
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            
-            cursor.execute('''
+
+            if field_name == 'project_name' and not single:
+                # 模糊查询
+                cursor.execute('''
+                    SELECT id, project_code, project_name, description,
+                           created_at, updated_at, status
+                    FROM projects
+                    WHERE project_name LIKE ?
+                    ORDER BY created_at DESC
+                ''', (f'%{field_value}%',))
+                return [dict(row) for row in cursor.fetchall()]
+
+            # 精确查询
+            cursor.execute(f'''
                 SELECT id, project_code, project_name, description,
                        created_at, updated_at, status
                 FROM projects
-                WHERE id = ?
-            ''', (project_id,))
-            
+                WHERE {field_name} = ?
+            ''', (field_value,))
+
             row = cursor.fetchone()
-            if not row:
-                return None
-            
-            return dict(row)
+            return dict(row) if row else None
+
+    @staticmethod
+    def get_project(project_id):
+        """
+        获取项目详情（通过ID）
+
+        Args:
+            project_id: 项目ID
+
+        Returns:
+            dict: 项目信息，不存在返回 None
+        """
+        return ProjectService._get_project_by_field('id', project_id)
 
     @staticmethod
     def get_project_by_code(project_code):
         """
         根据项目代码获取项目
-        
+
         Args:
             project_code: 项目代码
-            
+
         Returns:
             dict: 项目信息，不存在返回 None
         """
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, project_code, project_name, description,
-                       created_at, updated_at, status
-                FROM projects
-                WHERE project_code = ?
-            ''', (project_code,))
-            
-            row = cursor.fetchone()
-            if not row:
-                return None
-            
-            return dict(row)
+        return ProjectService._get_project_by_field('project_code', project_code)
 
     @staticmethod
     def get_project_by_name(project_name):
         """
         根据项目名称获取项目（支持模糊查询）
-        
+
         Args:
             project_name: 项目名称
-            
+
         Returns:
             list: 匹配的项目列表
         """
-        with get_db_connection() as conn:
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                SELECT id, project_code, project_name, description,
-                       created_at, updated_at, status
-                FROM projects
-                WHERE project_name LIKE ?
-                ORDER BY created_at DESC
-            ''', (f'%{project_name}%',))
-            
-            return [dict(row) for row in cursor.fetchall()]
+        return ProjectService._get_project_by_field('project_name', project_name, single=False)
 
     @staticmethod
     def resolve_project_id(project_identifier):

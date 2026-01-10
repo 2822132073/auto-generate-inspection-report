@@ -5,6 +5,9 @@
 
 from flask import Blueprint, request, jsonify
 from services.template_service import TemplateService
+from utils.logger import get_logger
+
+logger = get_logger('api.template')
 
 template_bp = Blueprint('templates', __name__)
 
@@ -45,16 +48,18 @@ def create_template():
             return jsonify({'success': False, 'error': '缺少必需字段: config'}), 400
         
         template = TemplateService.create_template(name, description, config)
-        
+
+        logger.info(f"创建模板成功: name={name}")
         return jsonify({
             'success': True,
             'message': '模板创建成功',
             'data': template
         }), 201
-        
+
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
+        logger.exception(f"创建模板异常: {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
 
 
@@ -80,6 +85,7 @@ def get_templates():
         }), 200
         
     except Exception as e:
+        logger.exception(f"获取模板列表异常: {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
 
 
@@ -98,6 +104,7 @@ def get_template(template_id):
         }), 200
         
     except Exception as e:
+        logger.exception(f"获取模板详情异常: id={template_id}, {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
 
 
@@ -116,6 +123,7 @@ def get_template_by_name(name):
         }), 200
         
     except Exception as e:
+        logger.exception(f"按名称获取模板异常: name={name}, {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
 
 
@@ -134,6 +142,7 @@ def get_default_template():
         }), 200
         
     except Exception as e:
+        logger.exception(f"获取默认模板异常: {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
 
 
@@ -175,15 +184,17 @@ def update_template(template_id):
         # 返回更新后的模板
         template = TemplateService.get_template(template_id)
         
+        logger.info(f"更新模板成功: id={template_id}")
         return jsonify({
             'success': True,
             'message': '模板更新成功',
             'data': template
         }), 200
-        
+
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
+        logger.exception(f"更新模板异常: id={template_id}, {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
 
 
@@ -195,13 +206,15 @@ def delete_template(template_id):
         
         if not success:
             return jsonify({'success': False, 'error': '模板不存在'}), 404
-        
+
+        logger.info(f"删除模板成功: id={template_id}")
         return jsonify({
             'success': True,
             'message': '模板删除成功'
         }), 200
-        
+
     except ValueError as e:
         return jsonify({'success': False, 'error': str(e)}), 400
     except Exception as e:
+        logger.exception(f"删除模板异常: id={template_id}, {e}")
         return jsonify({'success': False, 'error': f'服务器错误: {str(e)}'}), 500
