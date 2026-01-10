@@ -20,6 +20,14 @@ class ReportService:
     """报告生成服务"""
 
     @staticmethod
+    def _set_chinese_font(run, font_name='SimSun', size=None):
+        """为文本运行设置中文字体"""
+        run.font.name = font_name
+        run._element.rPr.rFonts.set(qn('w:eastAsia'), font_name)
+        if size:
+            run.font.size = size
+
+    @staticmethod
     def generate_project_report(project_id, options=None, template_id=None):
         """
         生成项目巡检报告
@@ -66,11 +74,28 @@ class ReportService:
         # 创建文档
         doc = Document()
 
-        # 设置中文字体支持
-        style = doc.styles['Normal']
-        style.font.name = 'SimSun'
-        style._element.rPr.rFonts.set(qn('w:eastAsia'), 'SimSun')
-        style.font.size = Pt(10.5)
+        # 设置中文字体支持 - 为所有样式设置字体
+        styles = doc.styles
+
+        # Normal 样式
+        normal_style = styles['Normal']
+        normal_style.font.name = 'SimSun'
+        normal_style._element.rPr.rFonts.set(qn('w:eastAsia'), 'SimSun')
+        normal_style.font.size = Pt(10.5)
+
+        # 标题样式（Heading 1-3）
+        for level in range(1, 4):
+            heading_style = styles[f'Heading {level}']
+            heading_style.font.name = 'SimSun'
+            heading_style._element.rPr.rFonts.set(qn('w:eastAsia'), 'SimSun')
+
+        # No Spacing 样式
+        try:
+            no_spacing_style = styles['No Spacing']
+            no_spacing_style.font.name = 'SimSun'
+            no_spacing_style._element.rPr.rFonts.set(qn('w:eastAsia'), 'SimSun')
+        except:
+            pass
 
         # 添加标题（使用模板格式）
         title_text = template_config['title_format'].format(
@@ -79,11 +104,17 @@ class ReportService:
         )
         title = doc.add_heading(title_text, level=0)
         title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # 为标题设置中文字体
+        for run in title.runs:
+            ReportService._set_chinese_font(run, size=Pt(16))
 
         # 添加项目信息
-        doc.add_paragraph(f"项目ID: {project_id}")
-        doc.add_paragraph(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        doc.add_paragraph(f"主机数量: {len(host_records)}")
+        info_para1 = doc.add_paragraph(f"项目ID: {project_id}")
+        ReportService._set_chinese_font(info_para1.runs[0])
+        info_para2 = doc.add_paragraph(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        ReportService._set_chinese_font(info_para2.runs[0])
+        info_para3 = doc.add_paragraph(f"主机数量: {len(host_records)}")
+        ReportService._set_chinese_font(info_para3.runs[0])
         doc.add_paragraph()  # 空行
 
         # 按主机分章节
@@ -100,10 +131,14 @@ class ReportService:
                 continue
 
             # 主机章节标题
-            doc.add_heading(f"{ReportService._to_chinese_number(host_idx)}、主机 ({detail['hostname']})", level=1)
+            host_heading = doc.add_heading(f"{ReportService._to_chinese_number(host_idx)}、主机 ({detail['hostname']})", level=1)
+            for run in host_heading.runs:
+                ReportService._set_chinese_font(run)
 
             # 1.1 基本信息
-            doc.add_heading(f"{host_idx}.1 基本信息", level=2)
+            info_heading = doc.add_heading(f"{host_idx}.1 基本信息", level=2)
+            for run in info_heading.runs:
+                ReportService._set_chinese_font(run)
 
             info_table = doc.add_table(rows=6, cols=2)
             info_table.style = 'Light Grid Accent 1'
@@ -121,21 +156,31 @@ class ReportService:
                 cells = info_table.rows[row_idx].cells
                 cells[0].text = label
                 cells[1].text = str(value)
+                # 设置表格中文字体
+                for cell in cells:
+                    for paragraph in cell.paragraphs:
+                        for run in paragraph.runs:
+                            ReportService._set_chinese_font(run)
 
             # 1.2 系统信息汇总
-            doc.add_heading(f"{host_idx}.2 系统信息汇总", level=2)
+            summary_heading = doc.add_heading(f"{host_idx}.2 系统信息汇总", level=2)
+            for run in summary_heading.runs:
+                ReportService._set_chinese_font(run)
 
             commands = detail.get('commands', [])
 
             for cmd_idx, cmd in enumerate(commands, 1):
                 # 命令小标题（根据模板配置决定是否显示）
                 if show_command_title:
-                    doc.add_heading(f"{host_idx}.2.{cmd_idx} {cmd['command']}", level=3)
+                    cmd_heading = doc.add_heading(f"{host_idx}.2.{cmd_idx} {cmd['command']}", level=3)
+                    for run in cmd_heading.runs:
+                        ReportService._set_chinese_font(run)
 
                 # 返回码（根据模板配置）
                 if include_return_code:
                     return_code = cmd.get('return_code', 0)
                     return_code_para = doc.add_paragraph(f"返回码: {return_code}")
+                    ReportService._set_chinese_font(return_code_para.runs[0])
                     if return_code != 0:
                         return_code_para.runs[0].font.color.rgb = RGBColor(255, 0, 0)
 
@@ -143,23 +188,28 @@ class ReportService:
                 if include_output:
                     output = cmd.get('output', '')
                     if output:
-                        doc.add_paragraph('执行结果:')
+                        result_label = doc.add_paragraph('执行结果:')
+                        ReportService._set_chinese_font(result_label.runs[0])
                         output_para = doc.add_paragraph(output)
                         output_para.style = 'No Spacing'
                         run = output_para.runs[0]
-                        run.font.name = 'Consolas'
-                        run._element.rPr.rFonts.set(qn('w:eastAsia'), 'Consolas')
+                        # 输出内容使用等宽字体，但支持中文
+                        run.font.name = 'SimSun'
+                        run._element.rPr.rFonts.set(qn('w:eastAsia'), 'SimSun')
+                        run._element.rPr.rFonts.set(qn('w:ascii'), 'Consolas')
                         run.font.size = Pt(9)
 
                 # 插入截图
                 if include_screenshots and cmd.get('screenshot_path'):
                     screenshot_file = SCREENSHOTS_DIR / cmd['screenshot_path']
                     if screenshot_file.exists():
-                        doc.add_paragraph('终端截图:')
+                        screenshot_label = doc.add_paragraph('终端截图:')
+                        ReportService._set_chinese_font(screenshot_label.runs[0])
                         try:
                             doc.add_picture(str(screenshot_file), width=Inches(REPORT_SCREENSHOT_WIDTH))
                         except Exception as e:
-                            doc.add_paragraph(f'[截图加载失败: {e}]')
+                            error_para = doc.add_paragraph(f'[截图加载失败: {e}]')
+                            ReportService._set_chinese_font(error_para.runs[0])
 
                 doc.add_paragraph()  # 空行
 
@@ -168,6 +218,8 @@ class ReportService:
         footer = section.footer
         footer.paragraphs[0].text = f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         footer.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if footer.paragraphs[0].runs:
+            ReportService._set_chinese_font(footer.paragraphs[0].runs[0])
 
         # 保存文档
         month_dir = datetime.now().strftime('%Y-%m')

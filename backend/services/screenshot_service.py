@@ -6,7 +6,10 @@
 from pathlib import Path
 from datetime import datetime
 from utils.screenshot_generator import generate_screenshot_bytes, sanitize_filename
+from utils.logger import get_logger
 from config import SCREENSHOTS_DIR, DEFAULT_FONT_FILE, DEFAULT_SCALE_FACTOR
+
+logger = get_logger('services.screenshot')
 
 
 class ScreenshotService:
@@ -54,7 +57,7 @@ class ScreenshotService:
         # 保存文件
         with open(file_path, 'wb') as f:
             f.write(screenshot_bytes)
-        print(f"截图已保存: {file_path}")
+        logger.debug(f"截图已保存: {file_path}")
 
         # 返回相对路径
         return f"{month_dir}/{filename}"
