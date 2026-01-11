@@ -17,8 +17,7 @@ frontend.log
 .frontend.pid
 
 # 数据库
-data/*.db
-data/*.db-journal
+data/*
 
 # IDE
 .vscode/

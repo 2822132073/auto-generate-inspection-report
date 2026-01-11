@@ -17,12 +17,32 @@ set -euo pipefail  # Exit on error, undefined variables, and pipe failures
 # 强制全部为英文
 export LANG=C
 
+
+# Define system commands to execute (using simple arrays for compatibility)
+COMMAND_NAMES=(
+    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
+    "top -b -n 1|head -6"
+    "free -h"
+    "ps -ef|grep mysql"
+)
+
+COMMAND_EXECS=(
+    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
+    "top -b -n 1 | head -6"
+    "free -h"
+    "ps -ef | grep mysql | grep -v grep"
+)
+
+
 # Global variables
 TMP_FILE=""
 IP_ADDRESS=""
 PS1_VALUE=""
 PROJECT_ID=""
 SERVER_URL=""
+
+
+
 
 # =============================================================================
 # Utility Functions
@@ -154,20 +174,7 @@ collect_env_data() {
     echo "$env_json"
 }
 
-# Define system commands to execute (using simple arrays for compatibility)
-COMMAND_NAMES=(
-    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
-    "top -b -n 1|head -6"
-    "free -h"
-    "ps -ef|grep mysql"
-)
 
-COMMAND_EXECS=(
-    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
-    "top -b -n 1 | head -6"
-    "free -h"
-    "ps -ef | grep mysql | grep -v grep"
-)
 
 # Collect command execution results
 collect_commands_data() {
