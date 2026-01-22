@@ -62,15 +62,16 @@ cleanup_and_exit() {
 # Enhanced JSON escape function
 escape_json() {
     local input="$1"
-    
+
     # Handle special characters in proper order (backslash first)
     input="${input//\\/\\\\}"   # Backslash -> \\
     input="${input//\"/\\\"}"   # Double quote -> \"
     input="${input//$'\t'/\\t}" # Tab -> \t
     input="${input//$'\n'/\\n}" # Newline -> \n
     input="${input//$'\r'/\\r}" # Carriage return -> \r
-    
-    echo "$input"
+
+    # 使用 printf 替代 echo，避免重新解释转义序列
+    printf '%s' "$input"
 }
 
 # Safe command execution with error handling and return code capture

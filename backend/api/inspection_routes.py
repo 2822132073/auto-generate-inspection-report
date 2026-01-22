@@ -2,6 +2,7 @@
 巡检数据管理 API 路由
 """
 
+import json
 from functools import wraps
 from flask import Blueprint, request, jsonify
 from services.inspection_service import InspectionService
@@ -34,7 +35,20 @@ def handle_api_error(func):
 @handle_api_error
 def create_inspection():
     """提交巡检数据"""
-    body = request.get_json()
+    # 先尝试正常解析 JSON
+    try:
+        body = request.get_json()
+    except Exception:
+        # 如果失败（如包含控制字符），读取原始数据使用 strict=False 解析
+        raw_data = request.get_data(as_text=True)
+        try:
+            body = json.loads(raw_data, strict=False)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 解析失败: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'JSON 格式错误: {str(e)}'
+            }), 400
 
     if not body:
         return jsonify({'success': False, 'error': '请求体不能为空'}), 400
