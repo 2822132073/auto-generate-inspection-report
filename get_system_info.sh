@@ -132,15 +132,15 @@ get_ip_address() {
 # Get PS1 value with multiple fallback methods
 get_ps1_value() {
     local ps1
-    
-    # Method 1: Current PS1 from interactive bash
-    ps1=$(bash -i -c 'echo "$PS1"' 2>/dev/null)
-    
-    # Method 2: From environment
+
+    # Method 1: Current PS1 from interactive bash (取最后一行，过滤欢迎消息)
+    ps1=$(bash -i -c 'echo "$PS1"' 2>/dev/null | tail -n 1)
+
+    # Method 2: From environment (如果上面的结果为空)
     if [[ -z "$ps1" && -n "${PS1:-}" ]]; then
         ps1="$PS1"
     fi
-    
+
     # Method 3: From configuration files
     if [[ -z "$ps1" ]]; then
         if [[ -f "$HOME/.bashrc" ]]; then
@@ -149,7 +149,7 @@ get_ps1_value() {
             ps1=$(grep -m1 '^PS1=' "$HOME/.bash_profile" 2>/dev/null | cut -d '=' -f2- | sed 's/^"//;s/"$//;s/^'\''//;s/'\''$//')
         fi
     fi
-    
+
     # Default fallback
     echo "${ps1:-\\u@\\h:\\w\\$ }"
 }
