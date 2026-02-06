@@ -65,6 +65,14 @@ def init_database():
 
     cursor.execute('CREATE INDEX IF NOT EXISTS idx_screenshot_status ON command_executions(screenshot_status)')
 
+    # 迁移：为旧表添加 name 字段
+    cursor.execute("PRAGMA table_info(command_executions)")
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'name' not in columns:
+        cursor.execute("ALTER TABLE command_executions ADD COLUMN name VARCHAR(200)")
+        # 旧数据：将 command 复制到 name 作为默认值
+        cursor.execute("UPDATE command_executions SET name = command WHERE name IS NULL")
+
     # 创建 report_generations 表（报告生成记录）
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS report_generations (

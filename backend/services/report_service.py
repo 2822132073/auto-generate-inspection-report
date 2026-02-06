@@ -111,10 +111,8 @@ class ReportService:
         # 添加项目信息
         info_para1 = doc.add_paragraph(f"项目ID: {project_id}")
         ReportService._set_chinese_font(info_para1.runs[0])
-        info_para2 = doc.add_paragraph(f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        info_para2 = doc.add_paragraph(f"主机数量: {len(host_records)}")
         ReportService._set_chinese_font(info_para2.runs[0])
-        info_para3 = doc.add_paragraph(f"主机数量: {len(host_records)}")
-        ReportService._set_chinese_font(info_para3.runs[0])
         doc.add_paragraph()  # 空行
 
         # 按主机分章节
@@ -140,7 +138,7 @@ class ReportService:
             for run in info_heading.runs:
                 ReportService._set_chinese_font(run)
 
-            info_table = doc.add_table(rows=6, cols=2)
+            info_table = doc.add_table(rows=5, cols=2)
             info_table.style = 'Light Grid Accent 1'
 
             info_data = [
@@ -148,8 +146,7 @@ class ReportService:
                 ('IP地址', detail.get('ip', '-')),
                 ('操作系统', detail.get('os', '-')),
                 ('内核版本', detail.get('kernel', '-')),
-                ('架构', detail.get('arch', '-')),
-                ('巡检时间', detail.get('timestamp', '-'))
+                ('架构', detail.get('arch', '-'))
             ]
 
             for row_idx, (label, value) in enumerate(info_data):
@@ -172,7 +169,8 @@ class ReportService:
             for cmd_idx, cmd in enumerate(commands, 1):
                 # 命令小标题（根据模板配置决定是否显示）
                 if show_command_title:
-                    cmd_heading = doc.add_heading(f"{host_idx}.2.{cmd_idx} {cmd['command']}", level=3)
+                    display_name = cmd.get('name') or cmd.get('command', '')
+                    cmd_heading = doc.add_heading(f"{host_idx}.2.{cmd_idx} {display_name}", level=3)
                     for run in cmd_heading.runs:
                         ReportService._set_chinese_font(run)
 
@@ -212,14 +210,6 @@ class ReportService:
                             ReportService._set_chinese_font(error_para.runs[0])
 
                 doc.add_paragraph()  # 空行
-
-        # 页脚：生成时间
-        section = doc.sections[0]
-        footer = section.footer
-        footer.paragraphs[0].text = f"报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        footer.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
-        if footer.paragraphs[0].runs:
-            ReportService._set_chinese_font(footer.paragraphs[0].runs[0])
 
         # 保存文档
         month_dir = datetime.now().strftime('%Y-%m')

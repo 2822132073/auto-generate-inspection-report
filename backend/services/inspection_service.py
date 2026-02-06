@@ -55,14 +55,15 @@ class InspectionService:
 
             for idx, (cmd_key, cmd_data) in enumerate(commands.items(), 1):
                 command = cmd_data.get('command', '')
+                name = cmd_data.get('name', cmd_key)  # 优先用 name，fallback 到 key
                 output = cmd_data.get('output', '')
                 return_code = cmd_data.get('return_code', 0)
 
                 cursor.execute('''
                     INSERT INTO command_executions
-                    (record_id, command, output, return_code, screenshot_path, screenshot_status, execution_order)
-                    VALUES (?, ?, ?, ?, NULL, ?, ?)
-                ''', (record_id, command, output, return_code, screenshot_status, idx))
+                    (record_id, command, name, output, return_code, screenshot_path, screenshot_status, execution_order)
+                    VALUES (?, ?, ?, ?, ?, NULL, ?, ?)
+                ''', (record_id, command, name, output, return_code, screenshot_status, idx))
 
             return {
                 'id': record_id,
