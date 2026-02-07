@@ -20,17 +20,15 @@ export LANG=C
 
 # Define system commands to execute (using simple arrays for compatibility)
 COMMAND_NAMES=(
-    "df -Th |egrep -v 'overlay|tmpfs|nfs'"
-    "top -b -n 1|head -6"
-    "free -h"
-    "ps -ef|grep mysql"
+    "磁盘使用情况"
+    "机器负载"
+    "内存使用情况"
 )
 
 COMMAND_EXECS=(
     "df -Th |egrep -v 'overlay|tmpfs|nfs'"
     "top -b -n 1 | head -6"
     "free -h"
-    "ps -ef | grep mysql | grep -v grep"
 )
 
 

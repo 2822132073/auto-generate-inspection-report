@@ -215,7 +215,7 @@ def get_css_styles(font_base64):
             width: fit-content;
         }
         .prompt {
-            color: #00ff00;
+            color: #ffffff;
         }
         .command {
             color: #ffffff;
