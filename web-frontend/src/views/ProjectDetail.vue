@@ -427,7 +427,16 @@ const selectedTemplate = computed(() => {
 
 // 计算部署命令
 const deployCommand = computed(() => {
-  const serverUrl = window.location.origin
+  // 获取后端服务器地址（从环境变量或前端地址推导）
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+  let serverUrl
+  if (apiBase.startsWith('http')) {
+    // 完整 URL，如 http://localhost:8000/api/v1
+    serverUrl = apiBase.replace(/\/api\/v\d+$/, '')
+  } else {
+    // 相对路径，使用前端 origin
+    serverUrl = window.location.origin
+  }
   const code = projectInfo.value?.project_code || projectCode
   return `# 下载巡检脚本
 curl -o /usr/local/bin/get_system_info.sh ${serverUrl}/static/get_system_info.sh
